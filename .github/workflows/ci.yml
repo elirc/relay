@@ -1,0 +1,67 @@
+name: CI
+
+# This workflow activates once the monorepo exists (Sprint 01 adds pnpm + Turborepo).
+# Until then, the `detect` job skips the build jobs so `main` stays green — no red X on
+# a docs-only repo. As the sprints introduce the engine, sandbox, and chaos gates,
+# uncomment the matching lines below.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      has_code: ${{ steps.check.outputs.has_code }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          if [ -f package.json ]; then
+            echo "has_code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_code=false (docs-only repo; skipping build jobs)"
+            echo "has_code=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  verify:
+    needs: detect
+    if: needs.detect.outputs.has_code == 'true'
+    runs-on: ubuntu-latest
+    # Relay's tests are written to run WITHOUT live infra (pure engine/expr/connector logic +
+    # in-memory fakes); DB/queue wiring is verified via typecheck + build. Turn these services on
+    # only when a sprint adds an integration test that genuinely needs them:
+    # services:
+    #   postgres:
+    #     image: postgres:16
+    #     env:
+    #       POSTGRES_PASSWORD: postgres
+    #     ports: ['5432:5432']
+    #     options: >-
+    #       --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    #   redis:
+    #     image: redis:7
+    #     ports: ['6379:6379']
+    #     options: >-
+    #       --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
+      - run: pnpm turbo run typecheck test build
+      # Relay gates — turn on as the sprints introduce them:
+      # - run: pnpm turbo run test:engine       # S05/S07 durable-run + replay determinism
+      # - run: pnpm turbo run test:sandbox      # S09 isolated-vm escape / resource-limit suite
+      # - run: pnpm turbo run test:chaos        # S13 vendor-farm failure-injection integration
+      # - run: pnpm turbo run test:cert         # S14 connector certification harness
