@@ -21,6 +21,7 @@ export type {
   Connection,
   Relay,
   RelayVersion,
+  TriggerBinding,
   Run,
   StepRun,
   RunEvent,
