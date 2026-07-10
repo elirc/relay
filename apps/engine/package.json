@@ -12,7 +12,11 @@
     "lint": "eslint src"
   },
   "dependencies": {
+    "@relay/connector-sdk": "workspace:*",
+    "@relay/connectors": "workspace:*",
     "@relay/db": "workspace:*",
+    "@relay/expr": "workspace:*",
+    "@relay/secrets": "workspace:*",
     "@relay/shared": "workspace:*",
     "bullmq": "^5.28.1",
     "ioredis": "^5.4.1",
