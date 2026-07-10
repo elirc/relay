@@ -23,6 +23,7 @@ export type {
   Relay,
   RelayVersion,
   TriggerBinding,
+  UsageRecord,
   Run,
   StepRun,
   RunEvent,
