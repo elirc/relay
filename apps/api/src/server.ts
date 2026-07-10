@@ -8,6 +8,7 @@ import { hookRoutes } from "./routes/hooks";
 import { runRoutes } from "./routes/runs";
 import { authRoutes } from "./auth";
 import { connectionRoutes } from "./routes/connections";
+import { connectorRoutes } from "./routes/connectors";
 
 /**
  * Build (but don't start) the app so tests can boot it in-process via `app.inject(...)`.
@@ -36,5 +37,6 @@ export function buildServer(): FastifyInstance {
   void app.register(hookRoutes);
   void app.register(runRoutes);
   void app.register(connectionRoutes);
+  void app.register(connectorRoutes);
   return app;
 }
