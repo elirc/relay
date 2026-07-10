@@ -6,6 +6,8 @@ import {
   DagDefinitionSchema,
   redactSecrets,
   runRelay,
+  shouldOffload,
+  MemoryObjectStore,
   type DagDefinition,
   type EngineDeps,
   type HttpRequestFn,
@@ -22,6 +24,9 @@ import { env } from "./env";
 
 const RUN_QUEUE = "relay:runs";
 const registry = buildRegistry();
+// Object storage for offloaded (large) step outputs (S10). In-memory here; production uses S3/GCS behind
+// the same interface. Only the ref lives in Postgres — blobs don't bloat the runs table.
+const objectStore = new MemoryObjectStore();
 
 const asJson = (v: unknown): Prisma.InputJsonValue | undefined =>
   v === undefined || v === null ? undefined : (v as Prisma.InputJsonValue);
@@ -122,18 +127,31 @@ async function executeVersioned(
     persistStep: async (_index, step, output) => {
       const safe = redactSecrets(output, [...usedSecrets]); // tokens never land in history
       const key = stepKeys.get(step.id);
-      // Commit the checkpoint: SUCCEEDED + the key + committedAt. A resume that finds this never re-runs.
+      // Offload large outputs to object storage (S10); only a ref stays in the row. Commit the checkpoint.
+      let outputVal: Prisma.InputJsonValue | undefined;
+      let outputRef: string | undefined;
+      if (shouldOffload(safe)) {
+        outputRef = `${runId}:${step.id}`;
+        await objectStore.put(outputRef, JSON.stringify(safe));
+      } else {
+        outputVal = asJson(safe);
+      }
       await prisma.stepRun.upsert({
         where: { runId_stepId: { runId, stepId: step.id } },
-        create: { runId, stepId: step.id, status: "succeeded", output: asJson(safe), idempotencyKey: key, committedAt: new Date() },
-        update: { status: "succeeded", output: asJson(safe), error: null, idempotencyKey: key, committedAt: new Date() },
+        create: { runId, stepId: step.id, status: "succeeded", output: outputVal, outputRef, idempotencyKey: key, committedAt: new Date() },
+        update: { status: "succeeded", output: outputVal, outputRef, error: null, idempotencyKey: key, committedAt: new Date() },
       });
     },
     loadPersistedOutput: async (index) => {
       const sr = await prisma.stepRun.findUnique({
         where: { runId_stepId: { runId, stepId: steps[index].id } },
       });
-      return sr?.output ?? {};
+      if (!sr) return {};
+      if (sr.outputRef) {
+        const raw = await objectStore.get(sr.outputRef); // lazy rehydration from storage
+        return raw ? JSON.parse(raw) : {};
+      }
+      return sr.output ?? {};
     },
     emit,
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),

@@ -174,7 +174,10 @@ model StepRun {
   stepId         String // the step's id within the relay
   status         String    @default("pending") // pending | running | succeeded | failed
   attempt        Int       @default(1)
+  // Small outputs stay inline in `output`; large ones (> threshold) are offloaded to object storage and
+  // only `outputRef` stays here (S10, flaw #2 harvest — blobs no longer bloat the OLTP runs table).
   output         Json?
+  outputRef      String?
   error          String?
   idempotencyKey String?
   committedAt    DateTime? // set when the checkpoint durably commits SUCCEEDED
