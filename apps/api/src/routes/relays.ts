@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { prisma, Prisma } from "@relay/db";
-import { RelayDefinitionSchema } from "@relay/shared";
+import { RelayDefinitionSchema, DagDefinitionSchema, validateDag } from "@relay/shared";
 import { buildRegistry } from "@relay/connectors";
 import { requireSession } from "../auth";
 import { enqueueRun } from "../queue";
@@ -51,8 +51,23 @@ export async function relayRoutes(app: FastifyInstance): Promise<void> {
   app.put<{ Params: { id: string } }>("/api/relays/:id/draft", async (req, reply) => {
     const ctx = await requireSession(req, reply);
     if (!ctx) return;
-    const def = RelayDefinitionSchema.parse(req.body);
-    assertUpstreamOnly(def); // second layer of defense, beyond the builder's picker
+
+    // A body with nodes+edges is a DAG (S08); otherwise it's the linear form, which we still accept.
+    const raw = (req.body ?? {}) as Record<string, unknown>;
+    let definition: unknown;
+    if (Array.isArray(raw.nodes) && Array.isArray(raw.edges)) {
+      const dag = DagDefinitionSchema.parse(raw);
+      const v = validateDag(dag);
+      // Validation at WRITE time (fast feedback) — a cycle submitted via raw API is rejected here with
+      // 422, not discovered when the executor hangs. The topoOrder guard is the second layer at run time.
+      if (!v.ok) return reply.code(422).send({ error: { code: "INVALID_DAG", message: v.errors.join("; ") } });
+      definition = dag;
+    } else {
+      const linear = RelayDefinitionSchema.parse(raw);
+      assertUpstreamOnly(linear); // second layer of defense, beyond the builder's picker
+      definition = linear;
+    }
+
     const relay = await prisma.relay.findFirst({
       where: { id: req.params.id, orgId: ctx.orgId },
       include: { versions: { orderBy: { version: "desc" } } },
@@ -63,13 +78,13 @@ export async function relayRoutes(app: FastifyInstance): Promise<void> {
     if (existingDraft) {
       return prisma.relayVersion.update({
         where: { id: existingDraft.id },
-        data: { definition: asJson(def) },
+        data: { definition: asJson(definition) },
       });
     }
     const nextVersion = (relay.versions[0]?.version ?? 0) + 1;
     return reply.code(201).send(
       await prisma.relayVersion.create({
-        data: { relayId: relay.id, version: nextVersion, definition: asJson(def), status: "draft" },
+        data: { relayId: relay.id, version: nextVersion, definition: asJson(definition), status: "draft" },
       }),
     );
   });
