@@ -13,4 +13,14 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 export { Prisma } from "@prisma/client";
-export type { Relay, Run, StepRun, RunEvent } from "@prisma/client";
+export type {
+  Organization,
+  User,
+  Membership,
+  Session,
+  Connection,
+  Relay,
+  Run,
+  StepRun,
+  RunEvent,
+} from "@prisma/client";
