@@ -87,8 +87,30 @@ model Relay {
   createdAt DateTime        @default(now())
   runs      Run[]
   versions  RelayVersion[]
+  bindings  TriggerBinding[]
 
   @@index([orgId])
+}
+
+// How a relay gets triggered (S06): one of three species. Created at publish; a webhook binding also
+// registers a subscription on the vendor (vendorSubId) that a reconcile sweep keeps honest.
+model TriggerBinding {
+  id            String   @id @default(cuid())
+  relayId       String
+  relay         Relay    @relation(fields: [relayId], references: [id], onDelete: Cascade)
+  kind          String // polling | webhook | schedule
+  connector     String
+  triggerKey    String
+  connectionId  String?
+  cursor        String? // polling: newest item id seen
+  webhookSecret String? // shared secret for verifying inbound signatures
+  vendorSubId   String? // managed webhook subscription id at the vendor
+  scheduleTier  String? // free | pro | business
+  misfirePolicy String?  @default("skip") // skip | runOnce
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  @@index([relayId])
 }
 
 // An immutable snapshot of a relay's graph (S04). Editing a published version doesn't mutate it —
