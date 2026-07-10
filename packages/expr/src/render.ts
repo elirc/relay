@@ -1,5 +1,5 @@
 import { ExprRenderError } from "./errors";
-import { tokenize, parsePath } from "./tokenizer";
+import { tokenize } from "./tokenizer";
 
 /** The data a template resolves against: the trigger payload and prior step outputs. */
 export interface Scope {
@@ -7,8 +7,6 @@ export interface Scope {
   steps?: unknown[];
   [key: string]: unknown;
 }
-
-const REF_RE = /\{\{([^}]*)\}\}/g;
 
 /**
  * Walk a path over the scope. A missing segment is a **render-time error**, not a silent empty string —
@@ -48,15 +46,11 @@ export function render(template: string, scope: Scope): unknown {
     return resolvePath(tokens[0].path, scope);
   }
 
-  let result = tokens
+  // SINGLE PASS (S13, flaw #1 fix). Resolved values are INERT DATA — we never re-scan them for more
+  // templates. The old code looped, re-expanding any `{{…}}` that appeared inside a resolved value; a
+  // SheetLite row containing `{{connection.token}}` would then get re-evaluated into an action input,
+  // exfiltrating a live secret. The invariant now: user *data* flowing through the renderer stays data.
+  return tokens
     .map((t) => (t.kind === "text" ? t.value : stringify(resolvePath(t.path, scope))))
     .join("");
-
-  // Resolve references that appear inside resolved values, too, so nested templates fill in.
-  let prev = "";
-  while (result !== prev && result.includes("{{")) {
-    prev = result;
-    result = result.replace(REF_RE, (_, inner) => stringify(resolvePath(parsePath(inner), scope)));
-  }
-  return result;
 }
