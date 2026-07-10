@@ -55,3 +55,32 @@ defineAction({
 ## Testing your connector
 Drive `action.execute` with a fake `fetch` (see `connectors.test.ts`): assert the happy path AND the
 chaos cases (429 → `RateLimited`, malformed → `VendorDown`, 401 → `AuthFailed`). Chaos-always-on.
+
+---
+
+## v2: Versioning & Certification (S14)
+
+### Version your connector
+Declare a `version` (semver). Relays pin it, so a **breaking schema change is a MAJOR bump** — never
+silently reshape an action's input/output on the same version. Set `deprecated: true` to start a
+deprecation window; pinned relays keep working.
+
+### The certification harness is your rubric
+Run `certifyConnector(yourConnector)` (see `packages/connectors/src/certify.test.ts`). It checks:
+- **safety (must pass, any tier):** every action declares `idempotency`; every trigger declares
+  `dedupeKey`; a header `auth` scheme; a valid semver.
+- **quality (first-party bar):** object input/output schemas; a `basePath`.
+
+A connector that fails a **safety** check cannot ship in *any* tier. Quality gaps drop you to the
+community tier, clearly labeled — the safety floor never lowers.
+
+### The certification checklist (for the stranger)
+1. `version` is semver.
+2. `auth` is a header scheme with a `format`.
+3. Every action: tight `input`/`output` zod object schemas + an `idempotency` strategy (strongest
+   available — `vendorKey` > `naturalKey` > `dedupeWindow`).
+4. Every trigger: a `dedupeKey` that captures the vendor's item identity.
+5. `execute` uses ONLY `ctx.http` (never raw `fetch`); trust the error taxonomy, not status codes.
+6. `certifyConnector(...)` returns `strictPass: true`.
+
+If you can produce a `strictPass: true` connector from this guide alone, the guide works — and so do you.
