@@ -1,0 +1,70 @@
+// Prisma schema for Relay.
+// S01: the run-recording core — Relay (a workflow), Run, StepRun, and the append-only RunEvent log.
+// Deliberately minimal. Connections + orgs arrive S02; immutable relay Versions + checkpoints S05/S07.
+//
+// ADR-0002: run state lives HERE (Postgres), not in Redis. Runs are business records — queryable,
+// durable, auditable. Redis holds *work* (the job queue); Postgres holds *truth*. If Redis vanished
+// mid-run, everything in this schema must survive.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Relay {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  runs      Run[]
+}
+
+model Run {
+  id         String     @id @default(cuid())
+  relayId    String
+  relay      Relay      @relation(fields: [relayId], references: [id], onDelete: Cascade)
+  // Status is a String whose allowed values are the RunStatus union in @relay/shared — the domain
+  // vocabulary lives in ONE place (shared), not duplicated as a Prisma enum that could drift.
+  status     String     @default("pending")
+  trigger    Json // the inbound trigger payload that started this run
+  createdAt  DateTime   @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+  steps      StepRun[]
+  events     RunEvent[]
+
+  @@index([relayId, createdAt])
+}
+
+model StepRun {
+  id        String   @id @default(cuid())
+  runId     String
+  run       Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  stepId    String // the step's id within the relay
+  status    String   @default("pending") // StepStatus from @relay/shared
+  attempt   Int      @default(1) // always 1 in S01; per-step retries arrive in S07
+  output    Json?
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@unique([runId, stepId])
+}
+
+model RunEvent {
+  id     String   @id @default(cuid())
+  runId  String
+  run    Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  // `seq` is monotonic within a run — the append-only ordering key, independent of wall-clock. The
+  // unique constraint makes the log tamper-evident: you cannot silently insert or reorder an event.
+  seq    Int
+  type   String // RunEventType from @relay/shared
+  stepId String?
+  data   Json?
+  at     DateTime @default(now())
+
+  @@unique([runId, seq])
+  @@index([runId, seq])
+}
