@@ -9,8 +9,9 @@ planted-then-harvested design debt, and inline review commentary.
 > curriculum notes are the actual product. Read it in order and you go from junior to mid/senior on
 > backend orchestration. Start with [`docs/LEARNER-GUIDE.md`](docs/LEARNER-GUIDE.md).
 
-**Course 4** of a larger curriculum (following Tracer). Status: **scaffolding — Sprint 1 in progress.**
-Sprints land as merged PRs; watch the milestones.
+**Course 4** of a larger curriculum (following Tracer). Status: **complete — `v1.0.0`.** All 15 sprints
+shipped as merged PRs. See [CHANGELOG.md](CHANGELOG.md) and the
+[Course Retrospective](docs/COURSE-RETROSPECTIVE.md).
 
 ## What it will teach
 - **Durable execution** — runs that checkpoint, resume, and replay across process death (S5, S7).
