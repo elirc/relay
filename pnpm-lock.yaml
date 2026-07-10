@@ -44,6 +44,9 @@ importers:
       '@relay/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@relay/expr':
+        specifier: workspace:*
+        version: link:../../packages/expr
       '@relay/secrets':
         specifier: workspace:*
         version: link:../../packages/secrets
@@ -214,6 +217,18 @@ importers:
       tsx:
         specifier: ^4.19.2
         version: 4.23.0
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.4
+        version: 2.1.9(@types/node@22.20.1)
+
+  packages/expr:
+    devDependencies:
+      '@relay/config':
+        specifier: workspace:*
+        version: link:../config
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
