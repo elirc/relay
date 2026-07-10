@@ -38,6 +38,9 @@ importers:
       '@fastify/cors':
         specifier: ^10.0.1
         version: 10.1.0
+      '@relay/connectors':
+        specifier: workspace:*
+        version: link:../../packages/connectors
       '@relay/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -151,6 +154,47 @@ importers:
         version: 2.1.9(@types/node@22.20.1)
 
   packages/config: {}
+
+  packages/connector-sdk:
+    dependencies:
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      '@relay/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: ^22.7.9
+        version: 22.20.1
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.4
+        version: 2.1.9(@types/node@22.20.1)
+
+  packages/connectors:
+    dependencies:
+      '@relay/connector-sdk':
+        specifier: workspace:*
+        version: link:../connector-sdk
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      '@relay/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: ^22.7.9
+        version: 22.20.1
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.4
+        version: 2.1.9(@types/node@22.20.1)
 
   packages/db:
     dependencies:
