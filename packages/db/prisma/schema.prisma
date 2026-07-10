@@ -28,6 +28,21 @@ model Organization {
   connections Connection[]
   relays      Relay[]
   codeSteps   CodeStep[]
+  usage       UsageRecord[]
+}
+
+// One billable "task" (S12): a successful action step. The @@unique([runId, stepId]) enforces idempotent
+// metering at the database level — a retry or replay of the same step physically cannot double-bill.
+model UsageRecord {
+  id        String   @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  runId     String
+  stepId    String
+  createdAt DateTime @default(now())
+
+  @@unique([runId, stepId])
+  @@index([orgId, createdAt])
 }
 
 // A user-authored JavaScript code step (S09), versioned and pinned like a relay version. The source is
