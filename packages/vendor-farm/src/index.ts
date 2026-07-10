@@ -5,6 +5,7 @@ import { type VendorState } from "./kit";
 import { mailpost } from "./vendors/mailpost";
 import { sheetlite } from "./vendors/sheetlite";
 import { chatbox } from "./vendors/chatbox";
+import { calendarlite } from "./vendors/calendarlite";
 import { VENDORS, DEV_CLIENTS, type VendorName } from "./meta";
 
 export * from "./meta";
@@ -28,6 +29,7 @@ const REGISTRARS: Record<VendorName, (app: FastifyInstance, state: VendorState) 
   mailpost,
   sheetlite,
   chatbox,
+  calendarlite,
 };
 
 /**
