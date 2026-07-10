@@ -15,11 +15,79 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ── Orgs, identity, connections (S02) ──────────────────────────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  // The org's DEK, wrapped by the master KEK (envelope encryption, ADR-0004). Generated lazily the
+  // first time the org stores a secret. NULL until then — no org pays for a key it hasn't used.
+  wrappedDek  String?
+  createdAt   DateTime      @default(now())
+  memberships Membership[]
+  connections Connection[]
+  relays      Relay[]
+}
+
+model User {
+  id          String       @id @default(cuid())
+  email       String       @unique
+  name        String?
+  createdAt   DateTime     @default(now())
+  memberships Membership[]
+  sessions    Session[]
+}
+
+model Membership {
+  id     String @id @default(cuid())
+  userId String
+  orgId  String
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  role   String       @default("ADMIN") // ADMIN | MEMBER — compressed for S02
+
+  @@unique([userId, orgId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // We store only a HASH of the session token — a DB leak can't be replayed as a live session.
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Connection {
+  id                String   @id @default(cuid())
+  orgId             String
+  org               Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  vendor            String // "mailpost" | "sheetlite" | "chatbox"
+  externalAccountId String?
+  // Health is STORED, not computed at run time (S02 lesson): a connection that died Tuesday must be
+  // visible as unhealthy now, not discovered when a run fails at 3am.
+  status            String   @default("healthy") // healthy | unhealthy
+  scopes            String[]
+  // Tokens are envelope-encrypted with the org DEK — never at rest in plaintext.
+  accessTokenEnc    String?
+  refreshTokenEnc   String?
+  expiresAt         DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([orgId])
+}
+
 model Relay {
   id        String   @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   name      String
   createdAt DateTime @default(now())
   runs      Run[]
+
+  @@index([orgId])
 }
 
 model Run {
