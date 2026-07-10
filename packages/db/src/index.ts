@@ -19,6 +19,7 @@ export type {
   Membership,
   Session,
   Connection,
+  CodeStep,
   Relay,
   RelayVersion,
   TriggerBinding,
