@@ -12,6 +12,7 @@ interface StepRun {
   status: string;
   attempt: number;
   error: string | null;
+  output: unknown;
 }
 interface RunEvent {
   seq: number;
@@ -67,6 +68,12 @@ export default function RunDetailPage() {
                 attempt {s.attempt}
                 {s.error ? ` · ${s.error}` : ""}
               </span>
+              {/* Output is stored redacted (connection tokens masked before persist) — safe to show. */}
+              {s.output != null && Object.keys(s.output as object).length > 0 && (
+                <pre style={{ margin: "4px 0 0 15px", color: "#8b93a1", fontSize: 12 }}>
+                  {JSON.stringify(s.output)}
+                </pre>
+              )}
             </li>
           ))}
         </ul>
