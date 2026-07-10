@@ -90,9 +90,21 @@ importers:
 
   apps/engine:
     dependencies:
+      '@relay/connector-sdk':
+        specifier: workspace:*
+        version: link:../../packages/connector-sdk
+      '@relay/connectors':
+        specifier: workspace:*
+        version: link:../../packages/connectors
       '@relay/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@relay/expr':
+        specifier: workspace:*
+        version: link:../../packages/expr
+      '@relay/secrets':
+        specifier: workspace:*
+        version: link:../../packages/secrets
       '@relay/shared':
         specifier: workspace:*
         version: link:../../packages/shared

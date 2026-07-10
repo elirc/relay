@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { prisma, Prisma } from "@relay/db";
 import { RelayDefinitionSchema } from "@relay/shared";
 import { requireSession } from "../auth";
+import { enqueueRun } from "../queue";
 import { planRun, assertUpstreamOnly } from "../lib/relay-plan";
 
 const asJson = (v: unknown) => v as unknown as Prisma.InputJsonValue;
@@ -81,6 +82,26 @@ export async function relayRoutes(app: FastifyInstance): Promise<void> {
     const draft = relay.versions.find((v) => v.status === "draft");
     if (!draft) return reply.code(400).send({ error: { code: "NO_DRAFT", message: "nothing to publish" } });
     return prisma.relayVersion.update({ where: { id: draft.id }, data: { status: "published" } });
+  });
+
+  // Run now: create a real Run pinned to the published version and enqueue it (a manual trigger until
+  // real webhook/polling triggers arrive in S06). Truth first (the Run), then work (the job) — S01's rule.
+  app.post<{ Params: { id: string } }>("/api/relays/:id/run", async (req, reply) => {
+    const ctx = await requireSession(req, reply);
+    if (!ctx) return;
+    const relay = await prisma.relay.findFirst({
+      where: { id: req.params.id, orgId: ctx.orgId },
+      include: { versions: { where: { status: "published" }, orderBy: { version: "desc" }, take: 1 } },
+    });
+    if (!relay?.versions[0]) {
+      return reply.code(400).send({ error: { code: "NOT_PUBLISHED", message: "publish the relay first" } });
+    }
+    const trigger = (req.body as { trigger?: unknown })?.trigger ?? {};
+    const run = await prisma.run.create({
+      data: { relayId: relay.id, versionId: relay.versions[0].id, status: "pending", trigger: asJson(trigger) },
+    });
+    await enqueueRun(run.id);
+    return reply.code(202).send({ runId: run.id, status: run.status });
   });
 
   // Test-run: resolve the latest version's templates against sample trigger data. No real side effects —
