@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Deduper, dedupeTtlForInterval } from "./triggers/dedupe";
 import { intervalForTier, staggerOffsetMs, recoveryRuns } from "./triggers/schedule";
 import { reconcile } from "./triggers/reconcile";
-import { detectNewItems } from "./triggers/cursor";
+import { detectNewItems, subscriptionKey, cursorKey } from "./triggers/cursor";
 
 describe("Deduper (TTL window)", () => {
   it("fires a new key once and suppresses duplicates within the window", () => {
@@ -70,5 +70,22 @@ describe("polling cursor / new-item detection", () => {
 
   it("if the cursor item vanished, treats all as fresh (better a dup than a miss)", () => {
     expect(detectNewItems(items, "gone").fresh).toEqual(items);
+  });
+});
+
+describe("shared subscriptions (flaw #3 harvest)", () => {
+  const onSheet = (relayId: string) => ({ relayId, connectionId: "conn1", connector: "sheetlite", triggerKey: "row-created" });
+
+  it("two relays on the SAME resource share one subscription and one cursor", () => {
+    expect(subscriptionKey(onSheet("relayA"))).toBe(subscriptionKey(onSheet("relayB")));
+    expect(cursorKey(onSheet("relayA"))).toBe(cursorKey(onSheet("relayB"))); // one poll, not two
+  });
+
+  it("different connections or resources get different subscriptions", () => {
+    const a = onSheet("r");
+    const b = { ...a, connectionId: "conn2" };
+    const c = { ...a, triggerKey: "row-updated" };
+    expect(subscriptionKey(a)).not.toBe(subscriptionKey(b));
+    expect(subscriptionKey(a)).not.toBe(subscriptionKey(c));
   });
 });
