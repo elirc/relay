@@ -24,19 +24,36 @@ export interface SandboxResult {
 export interface SandboxOptions {
   input?: unknown;
   timeoutMs?: number;
+  /** cap on total captured console output (bytes) — the poison-pill guard (S13, flaw #5) */
+  maxLogBytes?: number;
+  maxLogLines?: number;
 }
 
 export function runCode(source: string, opts: SandboxOptions = {}): SandboxResult {
   const timeoutMs = opts.timeoutMs ?? 1000;
+  const maxLogBytes = opts.maxLogBytes ?? 64 * 1024;
+  const maxLogLines = opts.maxLogLines ?? 1000;
   const logs: string[] = [];
+  let logBytes = 0;
+  let truncated = false;
 
   // The ENTIRE surface the user code can see. Anything not here is undefined inside.
   const sandbox = {
     input: opts.input,
     console: {
-      // Capture logs for debugging. NOTE: this buffer is unbounded — see the sandbox review checklist.
+      // Capture logs for debugging — but CAPPED (S13, flaw #5 fix). Resource limits must cover EVERY
+      // channel the untrusted side can grow: CPU, memory, wall-time, AND output. The poison pill was
+      // `while(true) console.log('x')` OOMing the worker through the one uncapped channel — output.
       log: (...args: unknown[]) => {
-        logs.push(args.map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" "));
+        if (truncated) return;
+        if (logs.length >= maxLogLines || logBytes >= maxLogBytes) {
+          logs.push("… [output truncated: limit exceeded]");
+          truncated = true;
+          return;
+        }
+        const line = args.map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" ");
+        logBytes += line.length;
+        logs.push(line);
       },
     },
   };

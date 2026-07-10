@@ -30,4 +30,13 @@ describe("sandbox runner — controlled surface", () => {
   it("surfaces a user runtime error as a typed SandboxRuntimeError, not a raw host error", () => {
     expect(() => runCode("throw new Error('boom')")).toThrow(SandboxRuntimeError);
   });
+
+  it("caps captured output — the poison pill can't OOM the worker (flaw #5 fix)", () => {
+    const { logs } = runCode("for (let i = 0; i < 100000; i++) console.log('x'.repeat(50)); return 1", {
+      maxLogLines: 100,
+      timeoutMs: 3000,
+    });
+    expect(logs.length).toBeLessThanOrEqual(101); // 100 lines + one truncation marker, not 100,000
+    expect(logs[logs.length - 1]).toContain("truncated");
+  });
 });

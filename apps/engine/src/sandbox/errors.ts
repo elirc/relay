@@ -3,7 +3,12 @@
  * builder UI) can react per class: a limit breach is the user's runaway loop, a runtime error is their
  * bug, a blocked-egress is a security stop. Never let raw V8/host errors leak upward with host paths.
  */
-export type SandboxErrorKind = "SandboxTimeout" | "SandboxMemory" | "SandboxRuntimeError" | "SandboxBlockedEgress";
+export type SandboxErrorKind =
+  | "SandboxTimeout"
+  | "SandboxMemory"
+  | "SandboxRuntimeError"
+  | "SandboxBlockedEgress"
+  | "SandboxLimitExceeded";
 
 export class SandboxError extends Error {
   constructor(
@@ -28,5 +33,10 @@ export class SandboxRuntimeError extends SandboxError {
 export class SandboxBlockedEgress extends SandboxError {
   constructor(message: string) {
     super("SandboxBlockedEgress", message);
+  }
+}
+export class SandboxLimitExceeded extends SandboxError {
+  constructor(message: string) {
+    super("SandboxLimitExceeded", message);
   }
 }

@@ -53,3 +53,13 @@ export function assertUrlAllowed(rawUrl: string, allowlist: readonly string[]): 
   if (!allowed) throw new SandboxBlockedEgress(`host not in org allowlist: ${url.hostname}`);
   return url;
 }
+
+/**
+ * DNS-rebinding defense (S13 re-review). Host-based allowlisting is not enough: an allowlisted host can
+ * resolve to 127.0.0.1 at connect time. So after DNS resolution — right before the socket connects, and
+ * again after any redirect — re-check the RESOLVED IP against the blocklist. Allowlist the host, but pin
+ * the IP.
+ */
+export function assertResolvedIpAllowed(ip: string): void {
+  if (isBlockedTarget(ip)) throw new SandboxBlockedEgress(`resolved to a blocked internal IP: ${ip}`);
+}

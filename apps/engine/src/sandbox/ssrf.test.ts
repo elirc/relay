@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isBlockedTarget, assertUrlAllowed } from "./ssrf";
+import { isBlockedTarget, assertUrlAllowed, assertResolvedIpAllowed } from "./ssrf";
 import { SandboxBlockedEgress } from "./errors";
 
 describe("SSRF blocklist", () => {
@@ -35,5 +35,14 @@ describe("assertUrlAllowed (allowlist + blocklist, belt and suspenders)", () => 
 
   it("rejects non-http(s) schemes (no file://, no gopher SSRF)", () => {
     expect(() => assertUrlAllowed("file:///etc/passwd", allow)).toThrow(/http/);
+  });
+});
+
+describe("DNS-rebinding defense (S13 re-review)", () => {
+  it("refuses an allowlisted host that resolved to an internal IP", () => {
+    // host passed the allowlist, but DNS returned 127.0.0.1 at connect time
+    expect(() => assertResolvedIpAllowed("127.0.0.1")).toThrow(SandboxBlockedEgress);
+    expect(() => assertResolvedIpAllowed("169.254.169.254")).toThrow(/internal/);
+    expect(() => assertResolvedIpAllowed("93.184.216.34")).not.toThrow(); // a real public IP is fine
   });
 });
