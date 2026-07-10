@@ -237,6 +237,10 @@ importers:
         version: 2.1.9(@types/node@22.20.1)
 
   packages/expr:
+    dependencies:
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
     devDependencies:
       '@relay/config':
         specifier: workspace:*
@@ -265,6 +269,9 @@ importers:
 
   packages/shared:
     dependencies:
+      '@relay/expr':
+        specifier: workspace:*
+        version: link:../expr
       zod:
         specifier: ^3.23.8
         version: 3.25.76

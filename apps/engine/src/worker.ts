@@ -3,8 +3,10 @@ import IORedis from "ioredis";
 import { prisma, Prisma, type Connection } from "@relay/db";
 import {
   RelayDefinitionSchema,
+  DagDefinitionSchema,
   redactSecrets,
   runRelay,
+  type DagDefinition,
   type EngineDeps,
   type HttpRequestFn,
   type HttpStepDef,
@@ -13,6 +15,7 @@ import { render } from "@relay/expr";
 import { buildRegistry } from "@relay/connectors";
 import { makeHttp } from "@relay/connector-sdk";
 import { executeRun, type ExecDeps, type StepInput } from "./executor";
+import { executeDagTopo } from "./dag-exec";
 import { deriveIdempotencyKey } from "./idempotency";
 import { orgCipher } from "./secrets";
 import { env } from "./env";
@@ -150,6 +153,65 @@ async function executeVersioned(
   emit("run.succeeded");
 }
 
+// ── Engine v3 (S08): execute a DAG relay in topological order ────────────────────────────────────
+async function executeDagVersioned(
+  runId: string,
+  orgId: string,
+  trigger: unknown,
+  dag: DagDefinition,
+  connections: Connection[],
+): Promise<void> {
+  const byVendor = new Map(connections.map((c) => [c.vendor, c]));
+  const cipher = await orgCipher(orgId);
+  const usedSecrets = new Set<string>();
+  let seq = await prisma.runEvent.count({ where: { runId } });
+  const emit = (type: string, data?: Record<string, unknown>) => {
+    const stepId = typeof data?.stepId === "string" ? data.stepId : null;
+    void prisma.runEvent.create({ data: { runId, seq: seq++, type, stepId, data: asJson(data) } }).catch(() => {});
+  };
+
+  const done = await prisma.stepRun.findMany({ where: { runId, status: "succeeded" }, select: { stepId: true, output: true } });
+  const doneOutputs = new Map(done.map((d) => [d.stepId, d.output]));
+
+  emit("run.started");
+  await executeDagTopo(dag, {
+    isCompleted: (id) => doneOutputs.has(id),
+    loadOutput: (id) => doneOutputs.get(id),
+    runNode: async (node, scope) => {
+      if (node.type === "trigger") return trigger; // the trigger node's "output" is the payload
+      const connector = registry.get(node.connector ?? "");
+      const action = connector?.actions.find((a) => a.key === node.action);
+      if (!connector || !action) throw new Error(`unknown action ${node.connector}.${node.action}`);
+      const conn = byVendor.get(node.connector ?? "");
+      if (!conn?.accessTokenEnc) throw new Error(`no healthy connection for ${node.connector}`);
+      const token = cipher.open(conn.accessTokenEnc);
+      usedSecrets.add(token);
+      const http = makeHttp({ baseUrl: env.VENDOR_FARM_URL + connector.basePath, auth: connector.auth, token });
+      const input: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(node.config ?? {})) input[k] = typeof v === "string" ? render(v, scope) : v;
+      const parsed = action.input.parse(input);
+      const key = deriveIdempotencyKey(action.idempotency, runId, node.id, parsed);
+      const out = await action.execute(
+        { connection: { id: conn.id, vendor: conn.vendor, scopes: conn.scopes }, http, logger: { info: () => {} }, idempotencyKey: key },
+        parsed,
+      );
+      const safe = redactSecrets(out, [...usedSecrets]);
+      await prisma.stepRun.upsert({
+        where: { runId_stepId: { runId, stepId: node.id } },
+        create: { runId, stepId: node.id, status: "succeeded", output: asJson(safe), idempotencyKey: key, committedAt: new Date() },
+        update: { status: "succeeded", output: asJson(safe), error: null, idempotencyKey: key, committedAt: new Date() },
+      });
+      emit("step.succeeded", { stepId: node.id });
+      return out;
+    },
+  });
+  emit("run.succeeded");
+}
+
+function isDag(def: unknown): boolean {
+  return typeof def === "object" && def !== null && Array.isArray((def as { nodes?: unknown }).nodes);
+}
+
 async function execute(job: Job<{ runId: string }>): Promise<void> {
   const { runId } = job.data;
   const run = await prisma.run.findUnique({ where: { id: runId }, include: { version: true, relay: true } });
@@ -160,9 +222,14 @@ async function execute(job: Job<{ runId: string }>): Promise<void> {
   });
   try {
     if (run.versionId && run.version) {
-      const def = RelayDefinitionSchema.parse(run.version.definition);
       const connections = await prisma.connection.findMany({ where: { orgId: run.relay.orgId } });
-      await executeVersioned(runId, run.relay.orgId, run.trigger, def.steps, connections);
+      if (isDag(run.version.definition)) {
+        const dag = DagDefinitionSchema.parse(run.version.definition);
+        await executeDagVersioned(runId, run.relay.orgId, run.trigger, dag, connections);
+      } else {
+        const def = RelayDefinitionSchema.parse(run.version.definition);
+        await executeVersioned(runId, run.relay.orgId, run.trigger, def.steps, connections);
+      }
     } else {
       await executeLegacyDemo(runId);
     }
