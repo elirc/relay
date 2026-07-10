@@ -17,7 +17,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         }}
       >
         <div style={{ maxWidth: 820, margin: "40px auto", padding: "0 16px" }}>
-          <h1 style={{ color: "#7c5cff" }}>Relay</h1>
+          <h1 style={{ color: "#7c5cff", marginBottom: 4 }}>Relay</h1>
+          <nav style={{ display: "flex", gap: 14, marginBottom: 20 }}>
+            <a href="/" style={{ color: "#8b93a1", textDecoration: "none" }}>
+              Runs
+            </a>
+            <a href="/connections" style={{ color: "#8b93a1", textDecoration: "none" }}>
+              Connections
+            </a>
+          </nav>
           {children}
         </div>
       </body>
