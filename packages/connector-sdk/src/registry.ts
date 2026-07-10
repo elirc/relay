@@ -16,6 +16,13 @@ export class Registry {
         throw new Error(`connector "${def.key}" action "${action.key}" is missing its idempotency declaration`);
       }
     }
+    for (const trigger of def.triggers) {
+      // S06: every trigger must declare how to dedupe its items, for the same reason actions must
+      // declare idempotency — the engine will otherwise fire someone's automation twice.
+      if (typeof trigger.dedupeKey !== "function") {
+        throw new Error(`connector "${def.key}" trigger "${trigger.key}" is missing its dedupeKey`);
+      }
+    }
     this.connectors.set(def.key, def);
   }
 

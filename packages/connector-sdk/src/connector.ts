@@ -46,6 +46,13 @@ export interface TriggerDef {
   name: string;
   type: "polling" | "webhook";
   output: ZodTypeAny;
+  /**
+   * What makes an incoming item unique (S06). Only the connector knows: a SheetLite row has an `id`, a
+   * MailPost email has a message-id, a ChatBox message has a `ts`; a vendor with nothing gets a content
+   * hash. The ENGINE enforces dedupe (a trigger that fires twice runs someone's automation twice); the
+   * CONNECTOR declares identity. Same division of labor as the idempotency strategies in S3.
+   */
+  dedupeKey: (item: unknown) => string;
 }
 
 export interface ConnectorDef {
