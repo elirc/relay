@@ -39,6 +39,8 @@ export class Registry {
     return this.list().map((c) => ({
       key: c.key,
       name: c.name,
+      version: c.version,
+      deprecated: c.deprecated ?? false,
       actions: c.actions.map((a) => ({
         key: a.key,
         name: a.name,

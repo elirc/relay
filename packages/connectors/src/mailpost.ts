@@ -9,6 +9,7 @@ import { defineConnector, defineAction } from "@relay/connector-sdk";
 export const mailpost = defineConnector({
   key: "mailpost",
   name: "MailPost",
+  version: "1.0.0",
   auth: { type: "header", name: "authorization", format: (t) => `Bearer ${t}` },
   basePath: "/mailpost",
   actions: [

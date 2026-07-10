@@ -12,6 +12,7 @@ import { defineConnector, defineAction } from "@relay/connector-sdk";
 export const chatbox = defineConnector({
   key: "chatbox",
   name: "ChatBox",
+  version: "1.0.0",
   auth: { type: "header", name: "authorization", format: (t) => `Token ${t}` },
   basePath: "/chatbox",
   actions: [

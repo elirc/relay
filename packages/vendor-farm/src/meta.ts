@@ -1,6 +1,6 @@
 /** Vendor metadata — the small, fastify-free facts the API's OAuth client needs to talk to each vendor. */
 
-export const VENDORS = ["mailpost", "sheetlite", "chatbox"] as const;
+export const VENDORS = ["mailpost", "sheetlite", "chatbox", "calendarlite"] as const;
 export type VendorName = (typeof VENDORS)[number];
 
 export interface VendorMeta {
@@ -34,6 +34,13 @@ export const VENDOR_META: Record<VendorName, VendorMeta> = {
     tokenPath: "/chatbox/oauth/token",
     scopes: ["chat.write", "channels.read"],
   },
+  calendarlite: {
+    name: "calendarlite",
+    label: "CalendarLite",
+    authorizePath: "/calendarlite/oauth/authorize",
+    tokenPath: "/calendarlite/oauth/token",
+    scopes: ["events.write", "events.read"],
+  },
 };
 
 /**
@@ -44,4 +51,5 @@ export const DEV_CLIENTS: Record<VendorName, { clientId: string; clientSecret: s
   mailpost: { clientId: "relay-mailpost", clientSecret: "mailpost-secret" },
   sheetlite: { clientId: "relay-sheetlite", clientSecret: "sheetlite-secret" },
   chatbox: { clientId: "relay-chatbox", clientSecret: "chatbox-secret" },
+  calendarlite: { clientId: "relay-calendarlite", clientSecret: "calendarlite-secret" },
 };
