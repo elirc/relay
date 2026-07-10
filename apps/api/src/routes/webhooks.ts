@@ -1,8 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { prisma, Prisma } from "@relay/db";
 import { enqueueRun } from "../queue";
+import { verifyWebhook, MemoryReplayGuard } from "../lib/webhook-verify";
 
 const asJson = (v: unknown) => v as unknown as Prisma.InputJsonValue;
+// Replay guard, shared across requests (Redis in prod so it spans instances).
+const replayGuard = new MemoryReplayGuard();
 
 export async function webhookRoutes(app: FastifyInstance): Promise<void> {
   /**
@@ -24,6 +27,15 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
     const version = binding.relay.versions[0];
     if (!version) {
       return reply.code(409).send({ error: { code: "UNPUBLISHED", message: "relay not published" } });
+    }
+
+    // Verify the vendor's signature (S13, flaw #4 fix). Production reads the exact raw request bytes;
+    // here we re-serialize the parsed body. An unsigned/forged/replayed/stale payload is refused.
+    const signature = req.headers["x-signature"];
+    const rawBody = JSON.stringify(req.body ?? {});
+    const verdict = verifyWebhook(rawBody, typeof signature === "string" ? signature : undefined, binding.webhookSecret ?? "", replayGuard);
+    if (verdict !== "ok") {
+      return reply.code(401).send({ error: { code: "BAD_SIGNATURE", message: verdict } });
     }
 
     const run = await prisma.run.create({
