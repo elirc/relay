@@ -18,6 +18,9 @@ const shapes: ChaosShapes = {
 
 export function sheetlite(app: FastifyInstance, state: VendorState): void {
   const rows: Row[] = [];
+  // SheetLite has no native idempotency, but the farm honors an Idempotency-Key so the engine's
+  // naturalKey strategy can dedupe row creation end to end (S07).
+  const idem = new Map<string, { row: Row }>();
   mountOAuth(app, state);
 
   const auth = (req: FastifyRequest): { accountId: string } | null => {
@@ -31,10 +34,16 @@ export function sheetlite(app: FastifyInstance, state: VendorState): void {
   app.post("/rows", async (req, reply) => {
     if (!(await applyChaos(state, reply, shapes))) return;
     if (!auth(req)) return reply.code(401).send(unauth);
+    const key = req.headers["idempotency-key"];
+    if (typeof key === "string" && idem.has(key)) {
+      return reply.code(201).send(idem.get(key)); // seen this key — no duplicate row
+    }
     const b = (req.body ?? {}) as { values?: Record<string, unknown> };
     const row: Row = { id: "row_" + (rows.length + 1), values: b.values ?? {} };
     rows.push(row);
-    return reply.code(201).send({ row });
+    const result = { row };
+    if (typeof key === "string") idem.set(key, result);
+    return reply.code(201).send(result);
   });
 
   app.get("/rows", async (req, reply) => {

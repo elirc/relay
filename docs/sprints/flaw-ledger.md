@@ -9,6 +9,6 @@
 | 5 | S09 | Sandbox console.log output captured unbounded — a logging loop can OOM the engine worker | code-step runner | S13 (output caps + truncation markers; the lab's poison pill) | planned |
 
 **In-PR arcs (planted and fixed inside one PR by design):**
-S02 OAuth refresh race (two steps refresh one token concurrently → one revoked) → per-connection mutex · S05 engine crash mid-run → duplicate vendor email sent → the S7 flagship reruns this exact scenario with checkpoints · S07 resume-replays a completed side effect → idempotency-strategy enforcement · S08 cycle submitted via API → DAG validation.
+S02 OAuth refresh race (two steps refresh one token concurrently → one revoked) → per-connection mutex · S05 engine crash mid-run → duplicate vendor email sent → **CLOSED in S07** (the flagship reran this exact scenario with checkpoints + idempotency keys; each side effect now fires exactly once) · S07 resume-replays a completed side effect → idempotency-strategy enforcement (done) · S08 cycle submitted via API → DAG validation.
 
 **Rules:** never fix a ledger flaw silently; harvesting commits quote the ledger row and flip Status.

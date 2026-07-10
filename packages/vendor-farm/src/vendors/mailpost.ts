@@ -21,6 +21,9 @@ const shapes: ChaosShapes = {
 
 export function mailpost(app: FastifyInstance, state: VendorState): void {
   const emails: Email[] = [];
+  // Idempotency store (S07): a repeated Idempotency-Key returns the SAME result without sending again.
+  // This is what makes MailPost the arbiter that closes the engine's crash window.
+  const idem = new Map<string, { id: string; status: string }>();
   mountOAuth(app, state);
 
   const auth = (req: FastifyRequest): { accountId: string } | null => {
@@ -35,6 +38,10 @@ export function mailpost(app: FastifyInstance, state: VendorState): void {
   app.post("/v1/emails", async (req, reply) => {
     if (!(await applyChaos(state, reply, shapes))) return;
     if (!auth(req)) return reply.code(401).send(unauth);
+    const key = req.headers["idempotency-key"];
+    if (typeof key === "string" && idem.has(key)) {
+      return reply.code(202).send(idem.get(key)); // seen this key — no second email
+    }
     const b = (req.body ?? {}) as Partial<Email>;
     const email: Email = {
       id: "em_" + (emails.length + 1),
@@ -44,7 +51,9 @@ export function mailpost(app: FastifyInstance, state: VendorState): void {
       status: "queued",
     };
     emails.push(email);
-    return reply.code(202).send({ id: email.id, status: email.status });
+    const result = { id: email.id, status: email.status };
+    if (typeof key === "string") idem.set(key, result);
+    return reply.code(202).send(result);
   });
 
   app.get("/v1/emails", async (req, reply) => {

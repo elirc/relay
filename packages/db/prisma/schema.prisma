@@ -149,16 +149,21 @@ model Run {
   @@index([relayId, createdAt])
 }
 
+// A StepRun is a durable CHECKPOINT (S07): once it commits SUCCEEDED, a resume rehydrates its output
+// and never re-executes the step. `idempotencyKey` is the stable key that travels with the side effect
+// so a crash between the vendor's ack and this checkpoint can't cause a duplicate.
 model StepRun {
-  id        String   @id @default(cuid())
-  runId     String
-  run       Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
-  stepId    String // the step's id within the relay
-  status    String   @default("pending") // StepStatus from @relay/shared
-  attempt   Int      @default(1) // always 1 in S01; per-step retries arrive in S07
-  output    Json?
-  error     String?
-  createdAt DateTime @default(now())
+  id             String    @id @default(cuid())
+  runId          String
+  run            Run       @relation(fields: [runId], references: [id], onDelete: Cascade)
+  stepId         String // the step's id within the relay
+  status         String    @default("pending") // pending | running | succeeded | failed
+  attempt        Int       @default(1)
+  output         Json?
+  error          String?
+  idempotencyKey String?
+  committedAt    DateTime? // set when the checkpoint durably commits SUCCEEDED
+  createdAt      DateTime  @default(now())
 
   @@unique([runId, stepId])
 }

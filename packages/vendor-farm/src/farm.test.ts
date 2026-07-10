@@ -48,6 +48,39 @@ describe("vendor farm (in-process)", () => {
     expect(sendRes.json()).toMatchObject({ status: "queued" });
   });
 
+  it("MailPost honors Idempotency-Key: the same key sends only ONE email (S07 arbiter)", async () => {
+    app = buildVendorFarm();
+    const c = DEV_CLIENTS.mailpost;
+    const auth = await app.inject({
+      method: "GET",
+      url: `/mailpost/oauth/authorize?client_id=${c.clientId}&redirect_uri=${encodeURIComponent("https://app/cb")}&scope=email.send`,
+    });
+    const code = new URL(auth.headers.location as string).searchParams.get("code")!;
+    const tok = await app.inject({
+      method: "POST",
+      url: "/mailpost/oauth/token",
+      payload: { grant_type: "authorization_code", code, client_id: c.clientId, client_secret: c.clientSecret, redirect_uri: "https://app/cb" },
+    });
+    const access = tok.json().access_token as string;
+    const send = () =>
+      app.inject({
+        method: "POST",
+        url: "/mailpost/v1/emails",
+        headers: { authorization: `Bearer ${access}`, "idempotency-key": "run-1:step-0" },
+        payload: { to: "a@b.com", subject: "hi", body: "yo" },
+      });
+    const first = await send();
+    const second = await send(); // a retry/resume with the SAME key
+    expect(first.json().id).toBe(second.json().id); // same result, no second email
+
+    const list = await app.inject({
+      method: "GET",
+      url: "/mailpost/v1/emails",
+      headers: { authorization: `Bearer ${access}` },
+    });
+    expect(list.json().data).toHaveLength(1);
+  });
+
   it("ChatBox: missing auth returns HTTP 200 with ok:false (the Slack gotcha)", async () => {
     app = buildVendorFarm();
     const res = await app.inject({
