@@ -34,7 +34,14 @@ export const sheetlite = defineConnector({
       },
       execute: async (ctx, input) => {
         const { values } = input;
-        const res = await ctx.http.request({ method: "POST", path: "/rows", body: { values } });
+        const res = await ctx.http.request({
+          method: "POST",
+          path: "/rows",
+          body: { values },
+          // The engine derives a NATURAL key (content hash) and passes it here; SheetLite has no native
+          // idempotency, but the farm honors this header so a retried/resumed add-row can't duplicate.
+          headers: ctx.idempotencyKey ? { "Idempotency-Key": ctx.idempotencyKey } : undefined,
+        });
         const b = res.body as { row: { id: string } };
         return { id: b.row.id };
       },
