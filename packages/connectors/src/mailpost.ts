@@ -41,6 +41,7 @@ export const mailpost = defineConnector({
       name: "New Email",
       type: "polling",
       output: z.object({ id: z.string(), to: z.string(), subject: z.string() }),
+      dedupeKey: (item) => `mailpost:${(item as { id: string }).id}`, // MailPost has a stable message id
     },
   ],
 });

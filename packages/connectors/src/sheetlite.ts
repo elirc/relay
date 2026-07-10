@@ -46,6 +46,7 @@ export const sheetlite = defineConnector({
       name: "Row Created",
       type: "webhook",
       output: z.object({ id: z.string(), values: z.record(z.unknown()) }),
+      dedupeKey: (item) => `sheetlite:${(item as { id: string }).id}`, // rows have ids
     },
   ],
 });
