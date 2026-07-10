@@ -32,6 +32,15 @@ describe("planRun (test-run resolution)", () => {
   });
 });
 
+describe("replay determinism", () => {
+  it("same trigger + same version → identical resolved inputs (side effects gated separately)", () => {
+    const trigger = { values: { email: "a@b.com", name: "Ada" } };
+    const a = planRun(def, trigger, [{ id: "em_1" }]);
+    const b = planRun(def, trigger, [{ id: "em_1" }]);
+    expect(a).toEqual(b); // deterministic — replay reproduces the same plan
+  });
+});
+
 describe("assertUpstreamOnly", () => {
   it("passes when steps reference only earlier steps", () => {
     expect(() => assertUpstreamOnly(def)).not.toThrow();

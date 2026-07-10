@@ -131,6 +131,34 @@ export async function relayRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(202).send({ runId: run.id, status: run.status });
   });
 
+  // Replay a historical run (S07). Default mode is **dry-run**: re-resolve the plan against the original
+  // trigger, no side effects. `live` is a deliberate choice that clones the trigger into a fresh run and
+  // enqueues it — replay that fires side effects by default would be a foot-gun cannon.
+  app.post<{ Params: { runId: string } }>("/api/runs/:runId/replay", async (req, reply) => {
+    const ctx = await requireSession(req, reply);
+    if (!ctx) return;
+    const src = await prisma.run.findFirst({
+      where: { id: req.params.runId, relay: { orgId: ctx.orgId } },
+    });
+    if (!src) return reply.code(404).send({ error: { code: "NOT_FOUND", message: "run" } });
+    const body = (req.body ?? {}) as { mode?: string; versionId?: string };
+    const mode = body.mode === "live" ? "live" : "dry-run";
+    const versionId = body.versionId ?? src.versionId;
+    if (!versionId) return reply.code(400).send({ error: { code: "NO_VERSION", message: "no version to replay" } });
+
+    if (mode === "dry-run") {
+      const version = await prisma.relayVersion.findUnique({ where: { id: versionId } });
+      if (!version) return reply.code(404).send({ error: { code: "NOT_FOUND", message: "version" } });
+      const def = RelayDefinitionSchema.parse(version.definition);
+      return { ok: true, mode, plan: planRun(def, src.trigger) };
+    }
+    const run = await prisma.run.create({
+      data: { relayId: src.relayId, versionId, status: "pending", trigger: asJson(src.trigger) },
+    });
+    await enqueueRun(run.id);
+    return reply.code(202).send({ ok: true, mode, runId: run.id });
+  });
+
   // Test-run: resolve the latest version's templates against sample trigger data. No real side effects —
   // it surfaces mapping mistakes (missing/forward refs) BEFORE the relay goes live.
   app.post<{ Params: { id: string } }>("/api/relays/:id/test-run", async (req, reply) => {

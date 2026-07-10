@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { apiGet } from "@/lib/api";
+import { apiGet, apiPost } from "@/lib/api";
 import { StatusDot, Panel, statusColor } from "@/lib/ui";
 
 interface StepRun {
@@ -34,6 +34,7 @@ export default function RunDetailPage() {
   const id = params?.id;
   const [run, setRun] = useState<RunDetail | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [replay, setReplay] = useState<string>("");
 
   useEffect(() => {
     if (!id) return;
@@ -41,6 +42,15 @@ export default function RunDetailPage() {
       .then(setRun)
       .catch((e: unknown) => setErr(String(e)));
   }, [id]);
+
+  const doReplay = async (mode: "dry-run" | "live") => {
+    try {
+      const r = await apiPost(`/api/runs/${id}/replay`, { mode });
+      setReplay(JSON.stringify(r, null, 2));
+    } catch (e) {
+      setReplay(String(e));
+    }
+  };
 
   if (err) return <Panel>{err}</Panel>;
   if (!run) return <Panel>Loading run…</Panel>;
@@ -54,6 +64,18 @@ export default function RunDetailPage() {
         <StatusDot status={run.status} />
         {run.relay.name}
       </h2>
+
+      {/* Replay: dry-run is the safe default (resolves the plan, no side effects); live is a deliberate
+          click that re-executes. Replay that live-fires by default would be a foot-gun cannon. */}
+      <div style={{ display: "flex", gap: 8, margin: "4px 0 12px" }}>
+        <button style={replayBtn} onClick={() => doReplay("dry-run")}>
+          Replay (dry-run)
+        </button>
+        <button style={{ ...replayBtn, borderColor: "#e06c75", color: "#e06c75" }} onClick={() => doReplay("live")}>
+          Replay LIVE
+        </button>
+      </div>
+      {replay && <pre style={{ background: "#14181d", border: "1px solid #232a32", borderRadius: 10, padding: 12, overflowX: "auto", fontSize: 12 }}>{replay}</pre>}
 
       <h3>Steps</h3>
       {run.steps.length === 0 ? (
@@ -94,3 +116,13 @@ export default function RunDetailPage() {
     </section>
   );
 }
+
+const replayBtn: React.CSSProperties = {
+  background: "transparent",
+  color: "#e6e9ef",
+  border: "1px solid #232a32",
+  borderRadius: 8,
+  padding: "6px 12px",
+  cursor: "pointer",
+  fontSize: 13,
+};
