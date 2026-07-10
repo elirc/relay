@@ -13,6 +13,7 @@ import { render } from "@relay/expr";
 import { buildRegistry } from "@relay/connectors";
 import { makeHttp } from "@relay/connector-sdk";
 import { executeRun, type ExecDeps, type StepInput } from "./executor";
+import { deriveIdempotencyKey } from "./idempotency";
 import { orgCipher } from "./secrets";
 import { env } from "./env";
 
@@ -69,6 +70,7 @@ async function executeVersioned(
   const byVendor = new Map(connections.map((c) => [c.vendor, c]));
   const cipher = await orgCipher(orgId);
   const usedSecrets = new Set<string>(); // plaintext tokens seen this run, for redaction
+  const stepKeys = new Map<string, string>(); // stepId -> derived idempotency key (for the checkpoint)
 
   // Incremental, seq-ordered event log (the S05 improvement over S01's persist-at-end). Fire-and-forget
   // so emit stays synchronous; seq is assigned in order, so `order by seq` reads correctly.
@@ -100,23 +102,28 @@ async function executeVersioned(
         token,
       });
       const parsed = action.input.parse(input); // validate AFTER render (expressions produce the input)
+      // Derive the idempotency key from the connector's DECLARED strategy (S07). Stable across retries
+      // AND resumes, so the vendor (vendorKey/naturalKey) recognizes a repeat and doesn't act twice.
+      const key = deriveIdempotencyKey(action.idempotency, runId, step.id, parsed);
+      stepKeys.set(step.id, key);
       return action.execute(
         {
           connection: { id: conn.id, vendor: conn.vendor, scopes: conn.scopes },
           http,
           logger: { info: () => {} },
-          // Stable across retries (NOT per-attempt) so a vendorKey action is deduped by the vendor.
-          idempotencyKey: `${runId}:${step.id}`,
+          idempotencyKey: key,
         },
         parsed,
       );
     },
     persistStep: async (_index, step, output) => {
       const safe = redactSecrets(output, [...usedSecrets]); // tokens never land in history
+      const key = stepKeys.get(step.id);
+      // Commit the checkpoint: SUCCEEDED + the key + committedAt. A resume that finds this never re-runs.
       await prisma.stepRun.upsert({
         where: { runId_stepId: { runId, stepId: step.id } },
-        create: { runId, stepId: step.id, status: "succeeded", output: asJson(safe) },
-        update: { status: "succeeded", output: asJson(safe), error: null },
+        create: { runId, stepId: step.id, status: "succeeded", output: asJson(safe), idempotencyKey: key, committedAt: new Date() },
+        update: { status: "succeeded", output: asJson(safe), error: null, idempotencyKey: key, committedAt: new Date() },
       });
     },
     loadPersistedOutput: async (index) => {
@@ -171,3 +178,27 @@ const worker = new Worker(RUN_QUEUE, execute, { connection });
 worker.on("completed", (job) => console.log(`engine: run ${job.data.runId} executed`));
 worker.on("failed", (job, err) => console.error(`engine: run ${job?.data.runId} failed`, err));
 console.log("engine worker started; waiting for runs…");
+
+/**
+ * Graceful shutdown (S07). Because every step is checkpointed, a deploy is no longer an incident: on
+ * SIGTERM we stop taking NEW jobs and let the in-flight run finish its current step and commit its
+ * checkpoint (`worker.close()` waits for the active job). If the process is killed harder, the run is
+ * requeued and RESUMES from its last checkpoint — no duplicate side effects. The durability machinery
+ * makes clean deploys nearly free; failure-handling and deploy-handling converge.
+ */
+let shuttingDown = false;
+async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`${signal}: draining — finishing the current step, then exiting`);
+  try {
+    await worker.close(); // waits for the active job to reach its next checkpoint
+    await connection.quit();
+    process.exit(0);
+  } catch (err) {
+    console.error("error during shutdown", err);
+    process.exit(1);
+  }
+}
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));
