@@ -12,9 +12,12 @@
     "lint": "eslint src"
   },
   "dependencies": {
+    "@fastify/cookie": "^11.0.1",
     "@fastify/cors": "^10.0.1",
     "@relay/db": "workspace:*",
+    "@relay/secrets": "workspace:*",
     "@relay/shared": "workspace:*",
+    "@relay/vendor-farm": "workspace:*",
     "bullmq": "^5.28.1",
     "fastify": "^5.1.0",
     "ioredis": "^5.4.1",
