@@ -20,6 +20,7 @@ export type {
   Session,
   Connection,
   Relay,
+  RelayVersion,
   Run,
   StepRun,
   RunEvent,

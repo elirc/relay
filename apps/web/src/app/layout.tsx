@@ -25,6 +25,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <a href="/connections" style={{ color: "#8b93a1", textDecoration: "none" }}>
               Connections
             </a>
+            <a href="/builder" style={{ color: "#8b93a1", textDecoration: "none" }}>
+              Builder
+            </a>
           </nav>
           {children}
         </div>

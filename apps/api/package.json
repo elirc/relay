@@ -16,6 +16,7 @@
     "@fastify/cors": "^10.0.1",
     "@relay/connectors": "workspace:*",
     "@relay/db": "workspace:*",
+    "@relay/expr": "workspace:*",
     "@relay/secrets": "workspace:*",
     "@relay/shared": "workspace:*",
     "@relay/vendor-farm": "workspace:*",
