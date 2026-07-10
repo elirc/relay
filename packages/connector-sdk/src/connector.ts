@@ -58,6 +58,13 @@ export interface TriggerDef {
 export interface ConnectorDef {
   key: string;
   name: string;
+  /**
+   * Semver (S14). Third parties pin their relays to a connector version. Changing an action's schema in a
+   * breaking way is a MAJOR bump; relays keep working on the version they pinned (S04 immutability,
+   * ecosystem-scaled). `deprecated` starts the deprecation-window clock without breaking pinned relays.
+   */
+  version: string;
+  deprecated?: boolean;
   auth: AuthScheme;
   /** path prefix under the vendor-farm root, e.g. "/mailpost" */
   basePath: string;
