@@ -1,11 +1,14 @@
+import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { prisma, Prisma } from "@relay/db";
 import { RelayDefinitionSchema } from "@relay/shared";
+import { buildRegistry } from "@relay/connectors";
 import { requireSession } from "../auth";
 import { enqueueRun } from "../queue";
 import { planRun, assertUpstreamOnly } from "../lib/relay-plan";
 
 const asJson = (v: unknown) => v as unknown as Prisma.InputJsonValue;
+const registry = buildRegistry();
 
 export async function relayRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/relays", async (req, reply) => {
@@ -81,7 +84,31 @@ export async function relayRoutes(app: FastifyInstance): Promise<void> {
     if (!relay) return reply.code(404).send({ error: { code: "NOT_FOUND", message: "relay" } });
     const draft = relay.versions.find((v) => v.status === "draft");
     if (!draft) return reply.code(400).send({ error: { code: "NO_DRAFT", message: "nothing to publish" } });
-    return prisma.relayVersion.update({ where: { id: draft.id }, data: { status: "published" } });
+    const published = await prisma.relayVersion.update({ where: { id: draft.id }, data: { status: "published" } });
+
+    // Ensure a trigger binding exists for this relay's trigger (S06). A webhook binding gets a secret we
+    // *would* verify inbound payloads against; a real deploy also registers a subscription on the vendor.
+    try {
+      const def = RelayDefinitionSchema.parse(draft.definition);
+      const trig = registry.get(def.trigger.connector)?.triggers.find((t) => t.key === def.trigger.trigger);
+      const existing = await prisma.triggerBinding.findFirst({
+        where: { relayId: relay.id, connector: def.trigger.connector, triggerKey: def.trigger.trigger },
+      });
+      if (!existing) {
+        await prisma.triggerBinding.create({
+          data: {
+            relayId: relay.id,
+            kind: trig?.type ?? "webhook",
+            connector: def.trigger.connector,
+            triggerKey: def.trigger.trigger,
+            webhookSecret: randomBytes(24).toString("hex"),
+          },
+        });
+      }
+    } catch {
+      // A malformed draft definition simply skips binding creation; publish still succeeds.
+    }
+    return published;
   });
 
   // Run now: create a real Run pinned to the published version and enqueue it (a manual trigger until
