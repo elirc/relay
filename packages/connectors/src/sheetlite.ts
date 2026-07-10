@@ -16,6 +16,7 @@ const addRowInput = z.object({
 export const sheetlite = defineConnector({
   key: "sheetlite",
   name: "SheetLite",
+  version: "1.0.0",
   auth: { type: "header", name: "x-sheetlite-key", format: (t) => t },
   basePath: "/sheetlite",
   actions: [
