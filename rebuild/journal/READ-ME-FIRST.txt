@@ -1,0 +1,227 @@
+RELAY: THE NOTIFICATION WAS SENT, BUT THE WORKER FORGOT
+======================================================
+A retrospective for Eli — 1 October 2026
+
+For the expanded upskilling course, start with LEARNING-PATH.md in this
+folder. USER-STORY-WALKTHROUGHS.md contains eight fictional customer stories;
+ARCHITECTURE-CLINIC.md explains the design boundaries and alternatives;
+PRACTICE-WORKBOOK.md provides labs, answer guides, a capstone and review-role
+prompts. Those teaching scenarios are distinct from the factual history below.
+
+Relay is the third local rebuild, after GitJira and Stockade. Its difficult
+question is not whether a button looks finished. It is whether a workflow can
+recover when the outside world accepted an effect that the worker did not
+have time to checkpoint.
+
+The result is a runnable JavaScript workflow studio with drafts, immutable
+published versions, runs, durable outputs, a separate worker, retries,
+cancellation, and a durable local mock notification provider. Run npm start
+and open http://127.0.0.1:4319. No real external service is contacted.
+
+Astra built the implementation and interface. Sol independently challenged
+the design and wrote API/durability tests. Root set the contract, reviewed
+integration and lifecycle details, verified the browser, and wrote this
+retrospective. The named models were gpt-6-astra and gpt-6-sol. This is a
+record of explicit engineering rationale and observed work, not invented
+dialogue or a reconstruction of hidden model reasoning. Exact final results
+belong to VERIFICATION.md.
+
+
+1. START WITH THE CRASH WINDOW
+-------------------------------
+
+Suppose a workflow performs two steps: compose a message, then send it.
+The provider accepts the message. Before the worker records success, the
+process dies. On restart, the workflow database says the send step is not done.
+
+Repeating the send might duplicate the message. Skipping it might lose the
+message in the alternative case where the provider never accepted it. The
+workflow database alone cannot distinguish those two histories.
+
+Sol's first challenge was to make that uncertainty real in the test. A normal
+restart after everything commits is too easy. We needed an effect stored
+outside the app transaction, a precise crash after acceptance, and inspection
+of both stores before recovery.
+
+That decision shaped the whole implementation. Relay has one SQLite database
+for workflows/runs/checkpoints and a separate one for provider receipts. The
+provider takes a stable key derived from run ID and step index. Matching
+retries return the same persisted receipt. Reusing a key for a different
+message conflicts rather than silently changing the old effect.
+
+This is deliberately a cooperating mock provider. A real service without
+idempotency support would need weaker guarantees or reconciliation. Local
+database locks cannot manufacture universal external exactly-once delivery.
+
+
+2. PIN THE PROGRAM, NOT JUST ITS NAME
+------------------------------------
+
+The editor has a mutable draft, but a run references an immutable published
+version. Otherwise a worker might complete the first half of yesterday's
+workflow and resume the second half of today's edited workflow after a crash.
+
+Publishing captures validated steps. The store also rejects updates and
+deletions of published version records. Draft edits require the version the
+editor read, so a stale save cannot silently replace newer changes.
+
+Run idempotency binds a request key to workflow identity and input. Replaying
+the original request after a new publication returns the original run, still
+pinned to its original version. A genuinely new execution uses a new key.
+
+We selected a small declarative language: transform text, wait, and send a
+simulated notification. Arbitrary JavaScript and URLs were excluded. The
+learning target is durable execution, not untrusted-code sandboxing. Merely
+putting code in a VM API would not settle the latter problem.
+
+Outputs remain inline in SQLite with a 64,000-byte serialized bound. A
+checkpoint that references an in-memory output is not durable just because
+the checkpoint itself survives. Larger outputs would need their own durable
+storage and cleanup design, not an invisible temporary map.
+
+
+3. A LEASE IS NOT PERMANENT OWNERSHIP
+-------------------------------------
+
+Workers claim persisted runs with a lease token and deadline. The token is
+checked when recording checkpoints, renewing ownership, completing, or
+recording failure. Another worker can reclaim an expired lease and resume
+from durable checkpoints.
+
+Sol insisted on a separate stale-writer test. Killing a worker proves that
+another can recover; it does not prove that an old worker which is still
+alive will be rejected after ownership changes. On Windows, relying on a
+Unix-style SIGSTOP would make that test awkward and fragile. The store
+therefore exposes claim/checkpoint operations so a test can submit the old
+token after a new claim exists.
+
+An additional implementation review moved default clock reads inside the
+write transaction after lock acquisition. If the clock is sampled before
+waiting for a database lock, a delayed operation can incorrectly judge an
+expired lease using an old time. This is a small detail with a direct link
+to the ownership promise.
+
+Waiting and provider work occur outside a long SQL transaction. Heartbeats
+renew the lease while eligible work proceeds. Each completed step's output
+is checkpointed in sequence. Recovery skips those completed steps rather
+than replaying the entire workflow.
+
+Cancellation prevents eligible future work and invalidates current ownership.
+It cannot undo a notification the provider already accepted. That limit is
+shown in the product instead of being hidden behind a reassuring Cancel label.
+
+
+4. TEST THE FAILURE YOU CLAIM TO SURVIVE
+---------------------------------------
+
+The worker includes a test-only crash flag. In Sol's real process test, the
+worker completed a transform, the mock provider committed its notification,
+and the worker exited with code 86 before checkpointing that notification.
+
+At that moment the app had exactly one transform checkpoint, and the provider
+had exactly one receipt. A new worker started without the crash flag. After
+the previous lease expired, it reclaimed the run and completed on attempt 2.
+The first checkpoint kept the same ID, and the provider still had one receipt.
+
+Those observations support a precise conclusion: this worker, checkpoint
+store, and cooperating durable provider recover from this uncertainty window
+without duplicating the recorded effect. They do not establish that any real
+network API behaves the same way, or that the system has been tested against
+every possible crash or storage failure.
+
+Other independent tests covered two competing workers, cancellation during
+work, old lease rejection, retry limits and manual recovery, immutable version
+pinning, replay across publication, large persisted outputs, and simultaneous
+initialization of fresh database files.
+
+Transient failure simulation is a test facility, not fabricated UI progress.
+Retries store their next eligible time and failure count. Exhaustion becomes
+a visible failed run. Manual retry resumes the same run and its checkpoints;
+it does not erase the earlier attempt history.
+
+
+5. CORRECT EXECUTION ALSO NEEDS A CORRECT LIFECYCLE
+--------------------------------------------------
+
+The web process and worker are separate, but npm start launches them together
+through a supervisor. Root reviewed what actually happens on shutdown.
+
+Each child listens for an IPC shutdown message. An IPC channel can itself keep
+a Node process alive after its database and HTTP listener close. Without
+disconnecting it, the supervisor might need its forced-kill fallback even
+though the application thought it had stopped cleanly.
+
+Astra added explicit IPC disconnection. Root's lifecycle test launched the
+actual supervisor against fresh temporary databases, opened a local session,
+ran a workflow through the worker and provider, then requested IPC shutdown.
+The supervisor exited cleanly without the 4.5-second force-kill fallback,
+and the web listener was gone. This is a more complete handoff check than
+starting the web server alone and assuming the worker will be managed.
+
+The review also carried over a session lesson from Stockade. Cookie Max-Age
+does not enforce lifetime against a client that retains and sends the token.
+Relay now checks session age on the server. Root requested that SQLite's busy
+timeout be configured before entering WAL mode, because web and worker may
+open a fresh store at the same time.
+
+
+6. THE EDITOR HAS ITS OWN DURABILITY PROMISE
+--------------------------------------------
+
+Durable backend state is not enough if polling or a delayed response erases an
+unsaved workflow draft. The browser must distinguish draft editing, saving,
+publishing, execution, and viewing a historical run. A published version shown
+on a run must not be replaced by whatever the current editor contains.
+
+Astra built the studio while Sol and root reviewed asynchronous ownership and
+user intent. Browser verification exercises actual creation, step editing,
+publication, execution, output inspection, cancellation, and failure/retry
+behavior. It also checks conflict handling and responsive layouts. Concrete
+findings and fixes from that phase are retained in the review files; they
+are not replaced with a fictional claim that the initial version was perfect.
+
+API tests and browser tests answer different questions. The API can reject a
+stale version correctly while the UI still overwrites its local draft. A
+browser can display a completed badge while the data is only in memory. The
+review method requires evidence on both sides of that boundary.
+
+Two concrete editor findings became browser regressions. Sol noticed that
+clearing a wait duration converted the empty string to zero. Reordering then
+made an incomplete field look valid. Astra preserved the blank value, and
+root verified that publication stayed blocked until a duration was supplied.
+Sol also found that an expired session stranded the old shell. The repair
+added explicit reconnection. Root expired the stored session, attempted a
+save, reconnected, and confirmed that the unsaved draft survived without an
+automatic repeat of the write. An explicit save then succeeded.
+
+The final formatted build passed 12 backend/process tests and all ten browser
+scenarios. Desktop and mobile screenshots were inspected. Source hashes,
+raw results, and screenshots accompany the verification report so the
+narrative's claims can be checked against the delivered implementation.
+
+
+7. USE THE SMALL SYSTEM TO ASK A BIGGER QUESTION
+------------------------------------------------
+
+This edition has no arbitrary-code sandbox, graph editor, real integrations,
+organization accounts, scheduled triggers, or distributed deployment. These
+omissions keep the implemented durability guarantees inspectable. SQLite's
+synchronous operations and local provider adapter are teaching tradeoffs,
+not claims about a hosted workflow platform's scale.
+
+Read README.md to run it, ARCHITECTURE.md to trace the boundaries, and
+VERIFICATION.md for actual final counts, commands, and limits. The evidence
+folder contains results and inspected screenshots; reviews contains the
+agents' explicit conclusions.
+
+For your next exercise, replace the provider with one that does not support
+idempotency. Before asking the models for code, write down what guarantee you
+can honestly offer. Then ask the reviewer to construct the ambiguous history
+you cannot distinguish. A useful answer may be a weaker promise plus a clear
+operator reconciliation flow, rather than a more complicated retry loop.
+
+Another experiment is moving output storage outside SQLite. Make the builder
+specify when a blob becomes durable, the reviewer identify orphan/missing-blob
+windows, and the verifier crash at those exact boundaries. The point of this
+rebuild is learning to connect a design promise with the evidence needed to
+believe it.

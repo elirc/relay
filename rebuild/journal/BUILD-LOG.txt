@@ -1,0 +1,49 @@
+RELAY REBUILD — FACTUAL BUILD LOG
+================================
+Started 1 October 2026 after completing GitJira in a sibling folder.
+
+User requested the other two recommended projects using the same JavaScript,
+Astra/Sol adversarial build process, each in its own folder with a retrospective.
+This project changes neither GitJira nor the old organizer files.
+
+Root set the local-edition contract. Astra builds backend, worker, durable fake
+provider and UI. Sol independently writes adversarial/durability tests; root
+owns browser/integration verification and the retrospective. The named models
+are gpt-6-astra and gpt-6-sol, both using high reasoning effort.
+
+Initial Sol objection: database leases do not guarantee external exactly-once
+effects. Provider receipts must persist separately and accept a stable run/step
+key with request fingerprint. Kill the worker only after that effect commits,
+before checkpointing; then restart and inspect both stores.
+
+Sol also requested a stale-token test. Killing a worker cannot show what a
+paused-but-still-alive worker would do after lease expiry. Windows lacks the
+SIGSTOP mechanism used by some Unix tests, so claim/checkpoint primitives must
+allow deterministic submission of an expired fence after another worker claims.
+
+Root accepted a bounded declarative workflow format instead of arbitrary
+user JavaScript: transform, wait, and simulated notification steps. All outputs
+remain in SQLite with explicit size bounds rather than memory-only offload.
+
+Implementation and review completed on 1 October 2026.
+
+Sol's independent crash test observed worker exit 86 after provider acceptance,
+then recovery on attempt 2 with one receipt and the original prior checkpoint.
+Its other tests covered competing workers, stale leases, retry exhaustion,
+manual recovery, immutable versions, validation, and output durability.
+
+Root challenged database startup order and supervisor shutdown. Astra moved
+busy_timeout before WAL initialization and disconnected IPC channels during
+shutdown. The real supervisor lifecycle test completed work and exited cleanly.
+
+Sol found server session aging, browser reauthentication, and empty wait-input
+issues. Astra repaired them. Root's browser tests confirmed draft preservation,
+explicit reconnection without automatic write replay, and publication blocked
+for the blank reordered wait field. Initial browser selector ambiguities were
+fixed in the harness, without attributing those failures to the product.
+
+All source was formatted with Prettier 3.9.9. Final syntax checks passed for
+12 JavaScript files, npm test passed 12/12, and browser checks passed 10/10
+with no runtime errors. Desktop and mobile layouts were visually inspected.
+VERIFICATION.md and evidence/ contain final results; reviews/ retains the
+actual agent reports. The provider remains a durable local simulation.
