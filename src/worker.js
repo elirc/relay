@@ -79,11 +79,17 @@ export async function executeClaim(
         const message = (step.prefix || "") + output.text;
         assertOutput({ text: message });
         if (!current()) return { status: "lease_lost" };
+        // The provider key is runId:stepIndex — stable across worker attempts,
+        // so a retry after a crash replays to the same receipt. A lease token
+        // would change on every attempt and defeat the deduplication.
         const receipt = acceptNotification(
           providerDb,
           `${runId}:${index}`,
           message,
         );
+        // CRASH_AFTER_EFFECT_ONCE exits exactly between the provider commit
+        // and the app checkpoint: the uncertainty window the durability tests
+        // must exercise directly (journal/DECISIONS.md).
         if (crashAfterEffect) {
           console.log(
             `Relay fault: provider accepted ${receipt.key}; exiting before checkpoint.`,
@@ -178,6 +184,8 @@ if (
       process.exitCode = 1;
     })
     .finally(() => {
+      // Disconnect the IPC channel after shutdown: on Windows a referenced
+      // channel keeps an otherwise-finished child process alive.
       if (process.connected) process.disconnect();
     });
 }

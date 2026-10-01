@@ -6,6 +6,9 @@ import { dirname, resolve } from "node:path";
 export const MAX_OUTPUT_BYTES = 64000;
 export const timestamp = (now = Date.now()) => new Date(now).toISOString();
 export function transaction(db, operation) {
+  // BEGIN IMMEDIATE takes the write lock up front, so any clock reading inside
+  // the operation happens after the wait for the lock — a deferred transaction
+  // could validate a lease against stale pre-lock time (journal/reviews/astra-build.md).
   db.exec("BEGIN IMMEDIATE");
   try {
     const result = operation();
@@ -20,6 +23,8 @@ function open(path) {
   if (path !== ":memory:")
     mkdirSync(dirname(resolve(path)), { recursive: true });
   const db = new DatabaseSync(path);
+  // busy_timeout must be set before the WAL switch: the journal_mode change is
+  // itself a write that can contend with another process on a fresh database.
   db.exec(
     "PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;",
   );
@@ -43,6 +48,9 @@ export function createStore({
     throw new Error("App and provider databases must be separate files.");
   const db = open(dbPath),
     providerDb = open(providerDbPath);
+  // The triggers make published versions immutable at the SQL layer. Runs pin
+  // a (workflow_id, number) pair so a restart resumes the exact program that
+  // was started, not whatever the draft has become since (journal/DECISIONS.md).
   db.exec(`
     CREATE TABLE IF NOT EXISTS workflows (
       id INTEGER PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
@@ -234,6 +242,9 @@ export function getEvents(db, runId) {
     )
     .all(runId);
 }
+// A checkpoint is only durable if everything it references is durable too:
+// output stays inline in the row, bounded at MAX_OUTPUT_BYTES, rather than
+// pointing at volatile memory that vanishes on restart (journal/DECISIONS.md).
 export function assertOutput(output) {
   if (
     !output ||
@@ -258,6 +269,8 @@ export function claimRun(
   if (!Number.isSafeInteger(leaseMs) || leaseMs < 100 || leaseMs > 300000)
     throw new Error("Invalid lease duration.");
   return transaction(db, () => {
+    // Sampled after BEGIN IMMEDIATE acquired the write lock: a claim that
+    // waited on the lock must judge lease expiry by now, not by when it queued.
     const now = suppliedNow ?? Date.now();
     db.prepare(
       "INSERT INTO workers(id,last_seen_at) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET last_seen_at=excluded.last_seen_at",
@@ -291,6 +304,10 @@ export function claimRun(
     return { ...getRun(db, row.id), leaseToken, leaseOwner: workerId };
   });
 }
+// The fencing check: every checkpoint, renewal, finish, and failure write
+// re-verifies the lease token and unexpired running state. An expired worker
+// can still be alive; after reclaim its late writes must be rejected
+// (journal/DECISIONS.md: lease identity checked on every checkpoint).
 export function leaseIsCurrent(db, runId, token, now = Date.now()) {
   return !!db
     .prepare(
@@ -421,6 +438,9 @@ export function failRun(
     return true;
   });
 }
+// The provider's half of effect deduplication: a replayed key returns the
+// existing receipt (same content required) instead of accepting a second
+// message. Worker-local dedup cannot survive a crash after the effect commits.
 export function acceptNotification(providerDb, key, message, now = Date.now()) {
   assertOutput({ text: message });
   return transaction(providerDb, () => {

@@ -167,6 +167,9 @@ export function createApp(options = {}) {
     return match?.[1];
   }
   app.use("/api", (req, _res, next) => {
+    // Session age is enforced server-side on every request: the cookie's
+    // Max-Age is a browser hint, not enforcement — a replayed old cookie must
+    // still be rejected here (journal/reviews/astra-build.md).
     const token = cookie(req);
     if (
       !token ||
@@ -322,6 +325,9 @@ export function createApp(options = {}) {
         "VALIDATION",
         "Idempotency key may contain letters, numbers, dots, underscores, colons, or hyphens.",
       );
+    // The request key is bound to this exact intent (workflow + input). A
+    // replay returns the original run — even if a newer version has been
+    // published since — and a reused key with a different intent is a 409.
     const intent = JSON.stringify({ workflowId, input });
     const result = transaction(db, () => {
       const workflow = requireWorkflow(workflowId),

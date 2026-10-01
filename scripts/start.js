@@ -10,6 +10,9 @@ function shutdown(exitCode = 0) {
   if (stopping) return;
   stopping = true;
   process.exitCode = exitCode;
+  // Graceful IPC shutdown first, forced kill only as the fallback below. Both
+  // ends must drop their IPC channels: on Windows a referenced channel keeps
+  // an otherwise-finished child alive (journal/reviews/astra-build.md).
   for (const child of children) if (child.connected) child.send("shutdown");
   if (process.connected) process.disconnect();
   const timeout = setTimeout(() => {
