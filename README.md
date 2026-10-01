@@ -46,3 +46,7 @@ shipped as merged PRs. See [CHANGELOG.md](CHANGELOG.md) and the
 > Side effects against *external* systems make idempotency existential rather than hygienic. A run
 > executes steps; if the engine dies mid-run, the durable log — not the queue — is what lets it resume
 > exactly once. Redis holds *work*; Postgres holds *truth*.
+
+## Local learning rebuild (October 2026)
+
+A self-contained local rebuild of this project lives in [rebuild/](rebuild/README.md): an Express + SQLite workflow runner centered on durable execution, lease fencing, and the effect/checkpoint crash window. Built through Astra/Sol adversarial review and expanded into part 3 of a three-project upskilling curriculum — see [CURRICULUM.md](CURRICULUM.md). It runs standalone (Node 22.16+, `npm ci && npm start` inside `rebuild/`) and is fully isolated from the main codebase in this repository.
