@@ -1,0 +1,70 @@
+﻿[
+    {
+        "Path":  "src\\app.js",
+        "SHA256":  "4B86948A8CB3D851F3BBF184407E6496947E8A6EFA25DABE0AB40BD4239B8C0D"
+    },
+    {
+        "Path":  "src\\server.js",
+        "SHA256":  "CBF1F1B0354573453F403F4B77D267616B4FC828A59CB57133E44BA70359B46C"
+    },
+    {
+        "Path":  "src\\store.js",
+        "SHA256":  "A686D0D39A0D7816851F7ADC14A61803FB29015B354A5BF0803B3DAF9AB25047"
+    },
+    {
+        "Path":  "src\\worker.js",
+        "SHA256":  "41D0BE84E3B1125A57FC6858FE86716569A7373730CC816A1106BBD10B5F5153"
+    },
+    {
+        "Path":  "public\\app.js",
+        "SHA256":  "88F86E50305422DE1EF583089CAC4A041BA02B58FAFD1DCD22F05E2955419003"
+    },
+    {
+        "Path":  "public\\favicon.svg",
+        "SHA256":  "A2882F5771928ED821BE28E05CD9833377965EC2518E28F922FA859A403C2E7E"
+    },
+    {
+        "Path":  "public\\index.html",
+        "SHA256":  "03E3BFD6626960CEB472473A3381C3C00612B07DC8018E068527739D0E26B4EE"
+    },
+    {
+        "Path":  "public\\style.css",
+        "SHA256":  "FF704BEA7D7719C971F64F3D20FC76BF0EA0A0DC2A2C1F2D61B1AF121943D03F"
+    },
+    {
+        "Path":  "scripts\\check.js",
+        "SHA256":  "5EB969E0B8E5495B23CE5398DB8695F62C19F1F55021915065E7E89761647DA1"
+    },
+    {
+        "Path":  "scripts\\start.js",
+        "SHA256":  "2D0250F2BE156ABAD7EBC70AC4A4586BF04D66A955FB8920DE575972CCCF9290"
+    },
+    {
+        "Path":  "tests\\adversarial.test.js",
+        "SHA256":  "63E042EBBF1AB5824C8FE894FC6F5D43FFAEC52C553FAFC31DE8C9A720490AE5"
+    },
+    {
+        "Path":  "tests\\browser.mjs",
+        "SHA256":  "DBC8ACD7071719AAE092D8D36AA192E070780703CB258582531D5C84B0953522"
+    },
+    {
+        "Path":  "tests\\core.test.js",
+        "SHA256":  "FA6927A348B3E39CEB36B2D811F1CFD251D9828212387F039FAF8FA87DF2CFC1"
+    },
+    {
+        "Path":  "tests\\durability.test.js",
+        "SHA256":  "15F4D384C0FA83A92E72860A9A429B954F23388CA4C8721F8F9A94276327852C"
+    },
+    {
+        "Path":  "tests\\lifecycle.test.js",
+        "SHA256":  "D1D382461C1EAAF8C82117BBC110A08ED4F04657BF2C25434E0484732447AB4B"
+    },
+    {
+        "Path":  "package.json",
+        "SHA256":  "B91BE19C3B8501E975021C4E752EF8CB9292733483091769D5557605906E11A9"
+    },
+    {
+        "Path":  "package-lock.json",
+        "SHA256":  "5A507BC8C02B868A046FFBBD3A97A84814388B4FB8E91C40566D5914B9AA060F"
+    }
+]

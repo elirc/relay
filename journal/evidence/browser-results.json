@@ -1,0 +1,46 @@
+{
+  "timestamp": "2026-10-01T16:28:02.724Z",
+  "results": [
+    {
+      "name": "login, real worker status and desktop overview",
+      "status": "passed"
+    },
+    {
+      "name": "create workflow and compose transform, wait and notify steps",
+      "status": "passed"
+    },
+    {
+      "name": "reordering preserves blank numeric input and cannot publish it as zero",
+      "status": "passed"
+    },
+    {
+      "name": "run completes through worker checkpoints and durable provider inbox",
+      "status": "passed"
+    },
+    {
+      "name": "stale draft conflict preserves fields until explicit latest-version load",
+      "status": "passed"
+    },
+    {
+      "name": "expired session can reconnect while preserving the unsaved draft",
+      "status": "passed"
+    },
+    {
+      "name": "lost run response retries the same key and creates only one run",
+      "status": "passed"
+    },
+    {
+      "name": "cancel a waiting run and prevent its notification step",
+      "status": "passed"
+    },
+    {
+      "name": "visible failed run can be retried after a real injected provider failure",
+      "status": "passed"
+    },
+    {
+      "name": "mobile studio, search and reload use persisted workflow state",
+      "status": "passed"
+    }
+  ],
+  "runtimeErrors": []
+}

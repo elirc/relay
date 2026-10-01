@@ -1,0 +1,64 @@
+RELAY UPSKILLING: READING AND PRACTICE PATH
+=========================================
+
+Your central question: what can an automation system honestly promise when
+definitions change, workers restart, ownership expires, and effects outlive
+the process that initiated them?
+
+READ-ME-FIRST.txt remains the factual retrospective. The expanded course adds
+fictional user stories, an architecture clinic and a practice workbook. Read
+the examples as design explanations and exercises, not as invented historical
+evidence or claims that the proposed integrations already exist.
+
+Suggested sequence:
+
+1. Define the program and its identity.
+   Read stories 1-2 and clinic sections 1-2. Complete workbook labs 1-2.
+   Explain draft revision, publication number, run identity, request key,
+   lease token and provider key without treating them as interchangeable.
+
+2. Walk through the ambiguous crash.
+   Read story 3 and clinic section 3. Complete lab 3. Draw both stores before
+   and after each commit. Identify the moment when an absent checkpoint does
+   not imply an absent effect.
+
+3. Separate ownership from effects.
+   Read story 4 and clinic sections 4-5. Complete lab 4. Explain why killing
+   a worker and submitting a stale token are different tests, and why a
+   database lease cannot undo a provider's already accepted notification.
+
+4. Make retries and cancellation observable.
+   Read stories 5-6 and clinic sections 6-8. Complete labs 5-6. Distinguish
+   claim attempts from recorded failure budget, and a cancelled run from an
+   externally reversed effect. Review how the editor preserves user work.
+
+5. Change a durable execution contract.
+   Complete lab 7 on persisted wait deadlines. Then read stories 7-8 and
+   clinic section 9. Design the local webhook capstone using the failure
+   matrix before adding code. Keep scope small enough to verify independently.
+
+Keep these artifacts in your learning journal:
+  - A table of identities, lifetimes and reuse semantics.
+  - A two-database crash timeline.
+  - A stale-owner counterexample and its rejecting predicate.
+  - A retry/cancel policy in words an operator can understand.
+  - A proposed extension with explicit unsupported behavior and crash tests.
+
+The running studio is at http://127.0.0.1:4319. Notifications are simulated.
+Manual changes persist. Existing tests use disposable stores; keep crash flags
+and experimental schema changes away from the saved demo's data directory.
+
+Current limitations are part of the course. A partially elapsed wait restarts
+its configured delay if it was not checkpointed. The recorded failure budget
+is distinct from total worker claims. Provider deduplication depends on a
+cooperating durable adapter. A request accepted by that adapter is not a real
+email delivery. Learning to name these boundaries is an engineering skill.
+
+Source paths in the guides are relative to relay-rebuild/. Actual results
+remain in VERIFICATION.md, evidence/ and reviews/. Suggested lab changes have
+not been applied by this documentation expansion.
+
+Compare with Stockade when you finish: both need durable command identity and
+guarded state transitions. Stockade can atomically mutate its simulated order
+and inventory. Relay deliberately cannot atomically mutate app checkpoints
+and the separate provider store, so it needs a different recovery contract.
