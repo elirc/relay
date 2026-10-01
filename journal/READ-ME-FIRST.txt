@@ -2,10 +2,10 @@ RELAY: THE NOTIFICATION WAS SENT, BUT THE WORKER FORGOT
 ======================================================
 A retrospective for Eli — 1 October 2026
 
-For the expanded upskilling course, start with LEARNING-PATH.txt in this
-folder. USER-STORY-WALKTHROUGHS.txt contains eight fictional customer stories;
-ARCHITECTURE-CLINIC.txt explains the design boundaries and alternatives;
-PRACTICE-WORKBOOK.txt provides labs, answer guides, a capstone and review-role
+For the expanded upskilling course, start with LEARNING-PATH.md in this
+folder. USER-STORY-WALKTHROUGHS.md contains eight fictional customer stories;
+ARCHITECTURE-CLINIC.md explains the design boundaries and alternatives;
+PRACTICE-WORKBOOK.md provides labs, answer guides, a capstone and review-role
 prompts. Those teaching scenarios are distinct from the factual history below.
 
 Relay is the third local rebuild, after GitJira and Stockade. Its difficult

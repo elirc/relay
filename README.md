@@ -1,16 +1,29 @@
 # Relay — local durable workflow studio
 
-A JavaScript workflow runner built through Astra implementation, Sol adversarial review, and independent browser verification. The [build narrative](journal/READ-ME-FIRST.txt) follows the real design decisions, failures, fixes, and tests.
+A JavaScript workflow runner built through Astra implementation, Sol adversarial review, and independent browser verification. The [build narrative](journal/READ-ME-FIRST.txt) follows the real design decisions, failures, fixes, and tests. This is part three of a three-project course — see the [curriculum overview](../CURRICULUM.md).
 
 ## Upskilling guides
 
-Start with the [learning path](journal/LEARNING-PATH.txt), then work through:
+Start with the [learning path](journal/LEARNING-PATH.md), then work through:
 
-- [Eight fictional user stories](journal/USER-STORY-WALKTHROUGHS.txt): implementation walkthroughs for versioning, crash recovery, leases, retries, cancellation, and proposed scheduling/webhook/graph extensions.
-- [Architecture clinic](journal/ARCHITECTURE-CLINIC.txt): request and effect identity, failure matrices, checkpoint ordering, lease timing, retry limits, storage, and process ownership.
-- [Practice workbook](journal/PRACTICE-WORKBOOK.txt): seven labs with answer guides, a local webhook capstone, and prompts for adversarial review roles.
+- [Eight fictional user stories](journal/USER-STORY-WALKTHROUGHS.md): implementation walkthroughs for versioning, crash recovery, leases, retries, cancellation, and proposed scheduling/webhook/graph extensions.
+- [Architecture clinic](journal/ARCHITECTURE-CLINIC.md): request and effect identity, failure matrices, checkpoint ordering, lease timing, retry limits, storage, and process ownership.
+- [Practice workbook](journal/PRACTICE-WORKBOOK.md): eight labs with answer guides, implementation tiers, a local webhook capstone, and prompts for adversarial review roles.
+- [Review fixes as diffs](journal/diffs/review-fixes.md): the blank-wait and expired-session findings reconstructed as study-able changes.
 
 Fictional review conversations are teaching examples. The original narrative and verification report preserve the actual build history and observed results.
+
+## Read the implementation
+
+The backend carries short comments at its invariant points (lease fencing, clock-after-lock, provider idempotency keys, the crash flag's exact position): [src/store.js](src/store.js), [src/worker.js](src/worker.js), [src/app.js](src/app.js), [scripts/start.js](scripts/start.js). The browser studio is plain ES modules with no build step, loaded from [public/app.js](public/app.js) (event wiring, polling, boot):
+
+- [public/api.js](public/api.js) — the one fetch wrapper and the expired-session gate
+- [public/state.js](public/state.js) — application state and the page/refresh/session identity tokens
+- [public/dom.js](public/dom.js) — markup helpers, escaping, formatting
+- [public/session.js](public/session.js) — login and the session reconnect dialog
+- [public/views.js](public/views.js) — shell, overview, workflows, runs, receipts, background refresh
+- [public/editor.js](public/editor.js) — draft editing, dirty tracking, compare-and-swap save/publish, conflict recovery
+- [public/dialogs.js](public/dialogs.js) — create-workflow and start-run dialogs (run key lifecycle)
 
 ## Run
 
@@ -47,6 +60,8 @@ npm run test:browser
 ```
 
 Tests use isolated databases and child processes. A fresh machine without a browser may need `npx playwright install chromium`. See [verification](journal/VERIFICATION.md) for exact results and limitations.
+
+`npm run test:browser` now runs the original ten workflow scenarios plus [tests/ui-races.mjs](tests/ui-races.mjs), a delayed-response race suite added with the 2026-10-01 upskilling expansion (stale run/draft responses, pending-write locks, session expiry mid-save). The verification report documents the original build's evidence; the race suite is additional coverage, not part of that record. Test runs regenerate `test-results/`; the preserved record of the original build lives in `journal/evidence/`. `.github/workflows/ci.yml` runs all three commands on GitHub when this folder is pushed as its own repository.
 
 The key durability test crashes a worker **after** the separate mock provider commits a receipt but **before** the workflow checkpoint commits. A restarted worker retries with the same key; the cooperating provider returns the same effect, and the run resumes. This does not imply universal exactly-once effects with arbitrary real services.
 
