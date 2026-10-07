@@ -30,12 +30,12 @@ The backend carries short comments at its invariant points (lease fencing, clock
 Requires Node 22.16+ with `node:sqlite`.
 
 ```powershell
-cd C:\Users\Owner\Desktop\astrafinalorganize\relay-rebuild
+cd rebuild        # from the repository root; it was built in a standalone folder named relay-rebuild
 npm ci
 npm start
 ```
 
-Open **http://127.0.0.1:4319**. The start command launches the web app and a worker. Dependencies and compatible Chromium are already present on this laptop. The first launch seeds example workflows. Later launches preserve drafts, published versions, runs, checkpoints, and simulated provider receipts in `data/`.
+Open **http://127.0.0.1:4319** (default from `src/server.js:2`; override with `PORT`). `npm start` runs `scripts/start.js`, which launches the web app and a worker. Playwright (for `npm run test:browser`) may need `npx playwright install chromium` on a fresh machine. The first launch seeds example workflows. Later launches preserve drafts, published versions, runs, checkpoints, and simulated provider receipts in `data/`.
 
 The local operator login has no password. It is a learning environment, not production authentication. Notification steps use a **durable local mock provider**; no email, webhook, or real external service is contacted.
 

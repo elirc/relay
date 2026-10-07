@@ -177,5 +177,5 @@ Review it with the builder/challenger/verifier protocol, one boundary at a
 time. The design document, challenged and revised, is the deliverable; the
 build is optional and large.
 
-Everything runs locally on this laptop: Node 22.16+, Express, `node:sqlite`,
-Playwright Chromium. No external service is contacted by any project.
+Every rebuild runs locally: Node 22.16+, Express, `node:sqlite`,
+Playwright Chromium (`npx playwright install chromium` on a fresh machine). No external service is contacted by any project.

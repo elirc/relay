@@ -12,7 +12,7 @@ uniform — not per-vendor conditionals scattered through connectors — and we 
 does when a step ultimately fails.
 
 ## Decision
-**Retry is a small table keyed on the S3 error taxonomy** (`packages/../executor.ts` `retryPolicy`):
+**Retry is a small table keyed on the S3 error taxonomy** (`apps/engine/src/executor.ts:24-37` `retryPolicy`; `MAX_ATTEMPTS = 4` at `:18`, backoff `min(30s, 1s·2^(attempt-1))` at `:20-22`):
 - `RateLimited` → retry, honoring `Retry-After` (retrying sooner is aggression that earns a longer ban).
 - `VendorDown` → retry with exponential backoff (transient).
 - `AuthFailed` → do not retry (the connection needs re-auth; retrying spams a dead credential).

@@ -13,7 +13,7 @@ planted-then-harvested design debt, and inline review commentary.
 shipped as merged PRs. See [CHANGELOG.md](CHANGELOG.md) and the
 [Course Retrospective](docs/COURSE-RETROSPECTIVE.md).
 
-## What it will teach
+## What it teaches
 - **Durable execution** — runs that checkpoint, resume, and replay across process death (S5, S7).
 - **Idempotency against systems you don't control** — retrying "send an email via someone's account"
   without double-sending (S7, and every connector from S2 on).
@@ -23,13 +23,17 @@ shipped as merged PRs. See [CHANGELOG.md](CHANGELOG.md) and the
   1st; the learner ships one solo against a certification harness (S3, S14).
 - **Retry semantics, rate limits, fairness, and metering** at scale (S6, S11, S12).
 
-## Planned stack
-- **Monorepo:** pnpm workspaces + Turborepo · TypeScript strict · Node
+## Stack (as shipped)
+- **Monorepo:** pnpm workspaces + Turborepo · TypeScript strict · Node ≥ 20 (root `package.json`)
 - **Web:** Next.js (builder UI, DAG graph editor) — `apps/web`
 - **API:** Fastify — `apps/api`
-- **Engine:** BullMQ + Redis, a dedicated worker fleet — `apps/engine`
+- **Engine:** BullMQ + Redis (ioredis), a dedicated worker — `apps/engine`
 - **Data:** PostgreSQL + Prisma (runs, checkpoints, connections) — `packages/db`
-- **Sandbox:** isolated-vm (code steps) — no ambient I/O
+  (`pnpm infra:up` starts it via `packages/db/docker-compose.yml`)
+- **Sandbox:** code steps run in `node:vm` with no ambient I/O (`apps/engine/src/sandbox/runner.ts`).
+  The file's own header calls this a **teaching stand-in, not a security boundary**; isolated-vm or
+  `worker_threads` is the production answer discussed in ADR-0011. The original plan named isolated-vm;
+  it is not a dependency of any package.
 - **Vendor farm:** three mock SaaS apps with OAuth2/REST/webhooks/HMAC + configurable failure injection
   — `packages/vendor-farm`
 - **Expressions:** a hand-rolled safe template language (`{{steps.1.output.email}}`) — **no `eval`, ever**
